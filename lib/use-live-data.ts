@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Pusher from "pusher-js";
 
 export function useLiveData<T>(
@@ -9,34 +9,42 @@ export function useLiveData<T>(
 ) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const isDeadRef = useRef(false);
 
-  useEffect(() => {
-    if (!url) return;
-    isDeadRef.current = false;
-
-    async function fetchData() {
-      if (isDeadRef.current) return;
-      try {
-        const res = await fetch(url!);
-        if (res.status === 404) {
-          isDeadRef.current = true;
-          setError("404 Room not found");
-          return;
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to sync room data.");
-        }
-        const json = await res.json();
-        setData(json);
-        setError(null);
-      } catch (e) {
-        if (!isDeadRef.current) {
-          setError(e instanceof Error ? e.message : "Sync error.");
-        }
+  const fetchData = useCallback(async () => {
+    if (!url || isDeadRef.current) return;
+    try {
+      const res = await fetch(url);
+      if (res.status === 404) {
+        isDeadRef.current = true;
+        setError("404 Room not found");
+        setLoading(false);
+        return;
       }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to sync room data.");
+      }
+      const json = await res.json();
+      setData(json);
+      setError(null);
+    } catch (e) {
+      if (!isDeadRef.current) {
+        setError(e instanceof Error ? e.message : "Sync error.");
+      }
+    } finally {
+      setLoading(false);
     }
+  }, [url]);
+
+  useEffect(() => {
+    if (!url) {
+      setLoading(false);
+      return;
+    }
+    isDeadRef.current = false;
+    setLoading(true);
 
     fetchData();
 
@@ -65,7 +73,7 @@ export function useLiveData<T>(
       if (channel) channel.unbind_all();
       if (pusher) pusher.unsubscribe(channelName);
     };
-  }, [url, channelName, eventName, pollIntervalMs]);
+  }, [url, channelName, eventName, pollIntervalMs, fetchData]);
 
-  return { data, error };
+  return { data, error, loading, refetch: fetchData };
 }
