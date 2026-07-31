@@ -306,15 +306,23 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 // ----------------------------------------------------------------------
 
 function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwordHash">; game: ClientGameState; yourSeat: number; code: string; }) {
-  // Sync state directly from server on every live update
-  const [optimisticBoard, setOptimisticBoard] = useState<Record<number, 1 | 2 | null>>(game.board || {});
+  // Initialize board with 24 empty slots if null/undefined
+  const [optimisticBoard, setOptimisticBoard] = useState<Record<number, 1 | 2 | null>>(() => {
+    const b = game.board || {};
+    const full: Record<number, 1 | 2 | null> = {};
+    for (let i = 0; i < 24; i++) full[i] = b[i] ?? null;
+    return full;
+  });
+
   const [selectedFrom, setSelectedFrom] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  // FORCE SYNC: Whenever 'game' object updates from server (via Pusher/Polling), update the board!
+  // Keep local board in sync with incoming server data
   useEffect(() => {
     if (game.board) {
-      setOptimisticBoard(game.board);
+      const full: Record<number, 1 | 2 | null> = {};
+      for (let i = 0; i < 24; i++) full[i] = game.board[i] ?? null;
+      setOptimisticBoard(full);
     }
     setSelectedFrom(null);
   }, [game.board, game.turnIdx, game.pendingRemoval]);
@@ -325,7 +333,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   const myPlayerId = yourSeat === 0 ? 1 : 2;
   const enemyPlayerId = myPlayerId === 1 ? 2 : 1;
 
-  // Exact Board Piece Counts
+  // Count occupied board pieces
   const myBoardCount = Object.values(optimisticBoard).filter((v) => v === myPlayerId).length;
   const enemyBoardCount = Object.values(optimisticBoard).filter((v) => v === enemyPlayerId).length;
 
@@ -348,14 +356,16 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     if (!isYourTurn) return;
     setError("");
 
+    const currentOwner = optimisticBoard[ptIdx];
+    const isEmpty = currentOwner === null || currentOwner === undefined;
+
     // --- 1. REMOVAL MODE (3 IN A ROW) ---
     if (isPendingRemoval) {
-      if (optimisticBoard[ptIdx] !== enemyPlayerId) {
+      if (currentOwner !== enemyPlayerId) {
         setError("You MUST click an OPPONENT'S piece (pink) to remove it!");
         return;
       }
 
-      // Optimistically clear the enemy piece on your screen immediately
       setOptimisticBoard((prev) => ({ ...prev, [ptIdx]: null }));
 
       const res = await fetch(`/api/rooms/${code}/move`, {
@@ -367,7 +377,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       if (!res.ok) {
         const errJson = await res.json();
         setError(errJson.error || "Could not remove piece.");
-        setOptimisticBoard(game.board || {}); // Revert if rejected
+        setOptimisticBoard(game.board || {});
       }
       return;
     }
@@ -378,7 +388,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
         setError("You placed all 9 pieces! Waiting for opponent to place theirs.");
         return;
       }
-      if (optimisticBoard[ptIdx] !== null) {
+      if (!isEmpty) {
         setError("Point is already taken!");
         return;
       }
@@ -401,18 +411,18 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
     // --- 3. MOVEMENT / FLYING MODE ---
     if (selectedFrom === null) {
-      if (optimisticBoard[ptIdx] === myPlayerId) {
+      if (currentOwner === myPlayerId) {
         setSelectedFrom(ptIdx);
       } else {
         setError("Click one of your own blue pieces to move it.");
       }
     } else {
-      if (optimisticBoard[ptIdx] === myPlayerId) {
-        setSelectedFrom(ptIdx); // Switch selection to another owned piece
+      if (currentOwner === myPlayerId) {
+        setSelectedFrom(ptIdx); // Switch selection
         return;
       }
 
-      if (optimisticBoard[ptIdx] !== null) {
+      if (!isEmpty) {
         setError("Destination point is occupied!");
         return;
       }
@@ -437,7 +447,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     }
   }
 
-  // Exact 24 points (0-23) matching standard Nine Men's Morris grid
+  // Exact 24 points (0-23)
   const POINTS = [
     // Outer Square (0-7)
     { x: 10, y: 10 }, { x: 50, y: 10 }, { x: 90, y: 10 },
@@ -456,10 +466,9 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   return (
     <div className="flex flex-col items-center gap-6">
       
-      {/* SCORE & INVENTORY TRACKER */}
+      {/* DASHBOARD */}
       <div className="grid w-full max-w-lg grid-cols-2 gap-4">
-        
-        {/* ENEMY (Always Pink on your screen) */}
+        {/* ENEMY */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10 shadow-[0_0_15px_rgba(255,91,200,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -504,7 +513,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           </div>
         </div>
 
-        {/* YOU (Always Blue on your screen) */}
+        {/* YOU */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10 shadow-[0_0_15px_rgba(77,216,255,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -548,10 +557,9 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* GAME STATUS INSTRUCTION BANNER */}
+      {/* BANNER */}
       <div className="text-center min-h-[40px] flex items-center justify-center">
         {isYourTurn ? (
           isPendingRemoval ? (
@@ -582,10 +590,8 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
       {error && <p className="text-neon-pink text-sm font-bold bg-neon-pink/10 px-4 py-1 rounded-lg border border-neon-pink/30">{error}</p>}
 
-      {/* THE BOARD */}
+      {/* BOARD */}
       <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple overflow-hidden">
-        
-        {/* BOARD LINES */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
           <rect x="25%" y="25%" width="50%" height="50%" fill="none" />
@@ -596,7 +602,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           <line x1="60%" y1="50%" x2="90%" y2="50%" />
         </svg>
 
-        {/* 24 INTERSECTION POINTS */}
         {POINTS.map((pt, i) => {
           const owner = optimisticBoard[i];
           const isMyPiece = owner === myPlayerId;
@@ -620,7 +625,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
               onClick={() => handlePointClick(i)}
             >
-              {/* Subtle dot for empty points */}
+              {/* Dot for unplaced empty points */}
               {!owner && <span className="w-2 h-2 rounded-full bg-white/40" />}
             </button>
           );
