@@ -453,32 +453,61 @@ function GameBoard({
         </div>
 
         <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
-          <div className="relative h-32 w-24 sm:h-36 sm:w-28">
-            <button
-              disabled={!isYourTurn || game.turnPhase !== "draw"}
-              onClick={() => sendMove({ action: "draw", source: "stock" })}
-              className="absolute left-0 top-0 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <PlayingCard id={null} faceDown />
-              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold">
-                {game.deckCount}
-              </span>
-            </button>
+          
+          <div className="flex items-center justify-center gap-6 sm:gap-12">
+            {/* Stock Pile */}
+            <div className="relative">
+              {/* Fake under-cards to give the deck thickness */}
+              {game.deckCount > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
+              {game.deckCount > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
+              
+              <motion.button
+                drag={isYourTurn && game.turnPhase === "draw" ? true : false}
+                dragSnapToOrigin
+                whileDrag={{ scale: 1.05, zIndex: 50 }}
+                onDragEnd={(e, info) => {
+                  // If the user drags the card downwards toward their hand, draw it
+                  if (info.offset.y > 60) {
+                    sendMove({ action: "draw", source: "stock" });
+                  }
+                }}
+                disabled={!isYourTurn || game.turnPhase !== "draw"}
+                onClick={() => sendMove({ action: "draw", source: "stock" })}
+                className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <PlayingCard id={null} faceDown />
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                  {game.deckCount}
+                </span>
+              </motion.button>
+            </div>
 
-            <button
-              disabled={!isYourTurn || game.turnPhase !== "draw" || !game.discardTop}
-              onClick={() => sendMove({ action: "draw", source: "discard" })}
-              className="absolute left-6 top-1 disabled:cursor-not-allowed sm:left-7"
-              style={{ transform: "rotate(7deg)" }}
-            >
-              {game.discardTop ? (
-                <PlayingCard id={game.discardTop} />
-              ) : (
-                <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 sm:h-28 sm:w-[4.5rem]" />
-              )}
-            </button>
+            {/* Discard Pile */}
+            <div className="relative">
+              <motion.button
+                drag={isYourTurn && game.turnPhase === "draw" && game.discardTop ? true : false}
+                dragSnapToOrigin
+                whileDrag={{ scale: 1.05, zIndex: 50 }}
+                onDragEnd={(e, info) => {
+                  // If the user drags the card downwards toward their hand, draw it
+                  if (info.offset.y > 60) {
+                    sendMove({ action: "draw", source: "discard" });
+                  }
+                }}
+                disabled={!isYourTurn || game.turnPhase !== "draw" || !game.discardTop}
+                onClick={() => sendMove({ action: "draw", source: "discard" })}
+                className="relative z-10 disabled:cursor-not-allowed"
+              >
+                {game.discardTop ? (
+                  <PlayingCard id={game.discardTop} />
+                ) : (
+                  <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem]" />
+                )}
+              </motion.button>
+            </div>
           </div>
 
+          {/* Decorative history of prior discards, off to the right */}
           {game.discard.length > 1 && (
             <div className="hidden items-end sm:flex" style={{ height: "7rem" }}>
               {game.discard.slice(0, -1).slice(-4).map((id, i, arr) => (
