@@ -9,24 +9,35 @@ import type { RoomSummary } from "@/lib/types";
 export default function JoinRoomModal({
   room,
   nickname,
+  initialCode = "",
   onClose,
 }: {
-  room: RoomSummary;
+  room: RoomSummary | null;
   nickname: string;
+  initialCode?: string;
   onClose: () => void;
 }) {
   const router = useRouter();
+  const [code, setCode] = useState(room?.code || initialCode);
   const [password, setPassword] = useState("");
   const [team, setTeam] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const isUnknownRoom = !room;
+  // If joining via manually typed code, we show password and team selection just in case the room requires it
+  const needsPassword = isUnknownRoom || room.hasPassword;
+  const is2v2 = isUnknownRoom || room.rules?.teamMode === "2v2";
 
   async function handleJoin() {
     setBusy(true);
     setError("");
 
     try {
-      const res = await fetch(`/api/rooms/${room.code}/join`, {
+      const targetCode = (room?.code || code).toUpperCase();
+      if (!targetCode) throw new Error("Please enter a room code.");
+
+      const res = await fetch(`/api/rooms/${targetCode}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -40,7 +51,7 @@ export default function JoinRoomModal({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to join room.");
 
-      router.push(`/room/${room.code}`);
+      router.push(`/room/${targetCode}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
       setBusy(false);
@@ -55,16 +66,33 @@ export default function JoinRoomModal({
         onClick={(e) => e.stopPropagation()}
         className="glass glow-blue w-full max-w-sm rounded-2xl p-6"
       >
-        <h2 className="mb-1 text-xl font-bold text-glow-purple">Join {room.name}</h2>
-        <p className="mb-4 text-xs text-white/50">Hosted by {room.hostNickname}</p>
+        <h2 className="mb-1 text-xl font-bold text-glow-purple">
+          {room ? `Join ${room.name}` : "Join via Code"}
+        </h2>
+        {room && <p className="mb-4 text-xs text-white/50">Hosted by {room.hostNickname}</p>}
+        {!room && <p className="mb-4 text-xs text-white/50">Enter the 6-character room code.</p>}
 
         <div className="space-y-4">
-          {room.hasPassword && (
+          {isUnknownRoom && (
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Room Code</label>
+              <input
+                type="text"
+                placeholder="e.g. A1B2C3"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                maxLength={6}
+                className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-neon-blue/50"
+              />
+            </div>
+          )}
+
+          {needsPassword && (
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Room Password</label>
               <input
                 type="password"
-                placeholder="Enter password"
+                placeholder={isUnknownRoom ? "Optional password" : "Enter password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-neon-blue/50"
@@ -72,10 +100,11 @@ export default function JoinRoomModal({
             </div>
           )}
 
-          {/* SHOW TEAM SELECTION IF IT IS 2v2 */}
-          {room.rules?.teamMode === "2v2" && (
+          {is2v2 && (
             <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Choose Team</label>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">
+                {isUnknownRoom ? "Choose Team (If 2v2)" : "Choose Team"}
+              </label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setTeam(1)}
@@ -106,7 +135,7 @@ export default function JoinRoomModal({
           </button>
           <button
             onClick={handleJoin}
-            disabled={busy || (room.hasPassword && !password)}
+            disabled={busy || (isUnknownRoom && !code) || (!isUnknownRoom && room.hasPassword && !password)}
             className="glow-blue flex-1 rounded-xl bg-gradient-to-r from-neon-blue to-neon-purple py-2.5 font-bold text-black disabled:opacity-50"
           >
             {busy ? "Joining..." : "Join"}
