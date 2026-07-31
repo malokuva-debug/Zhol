@@ -324,15 +324,18 @@ export function findGinDiscard(hand11: CardId[]): CardId | null {
 }
 
 /** Determines the win-category (and thus bonus) for a fully-melded winning hand. */
-export function classifyGin(handIds: CardId[], melds: Meld[]): GinType {
-  const usedJoker = melds.some((m) => m.cards.some((c) => isJokerId(c)));
+export function classifyGin(handIds: CardId[], melds: Meld[], discardId: CardId): GinType {
+  const discardedJoker = isJokerId(discardId);
+  
+  // Check if all 10 cards are the same suit (ignoring any jokers still held in hand)
   const realCards = handIds.filter((id) => !isJokerId(id)).map(makeCard);
   const suits = new Set(realCards.map((c) => c.suit));
   const allSameSuit = suits.size <= 1;
 
-  if (allSameSuit && usedJoker) return "suit_joker_gin";
-  if (allSameSuit && !usedJoker) return "suit_gin";
-  if (usedJoker) return "joker_gin";
+  if (allSameSuit && discardedJoker) return "suit_joker_gin";
+  if (allSameSuit && !discardedJoker) return "suit_gin";
+  if (discardedJoker) return "joker_gin";
+  
   return "normal_gin";
 }
 
