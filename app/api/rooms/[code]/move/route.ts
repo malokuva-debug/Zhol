@@ -42,11 +42,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       break;
     // --- ADD CICMIC BRANCH ---
     case "cicmic_place":
+      if (room.rules.gameMode === "cicmic" && room.game?.board) {
+        const pt = parsed.data.point;
+        
+        // Prevent placing if point is already taken
+        if (!room.game.board[pt]) {
+          const playerNum = seatIdx === 0 ? 1 : 2; // Assuming Host is P1, opponent is P2
+          room.game.board[pt] = playerNum;
+          
+          // Switch Turn to the other active player
+          const activeIndices = room.seats.map((s, idx) => s && !s.eliminated ? idx : -1).filter(idx => idx !== -1);
+          let nextIdx = activeIndices.findIndex(i => i === seatIdx) + 1;
+          if (nextIdx >= activeIndices.length) nextIdx = 0;
+          
+          room.game.turnIdx = activeIndices[nextIdx];
+          result = { ok: true };
+        } else {
+          result = { error: "Point is already taken!" };
+        }
+      }
+      break;
     case "cicmic_move":
     case "cicmic_remove":
-      // We will route these to your cicmic-logic engine here
-      // result = applyCicmicAction(room, seatIdx, parsed.data);
-      result = { ok: true }; 
+      result = { ok: true };
       break;
   }
 
