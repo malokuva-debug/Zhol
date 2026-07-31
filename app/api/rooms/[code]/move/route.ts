@@ -6,9 +6,14 @@ import { publishRoomUpdate, publishLobbyUpdate } from "@/lib/pusher";
 import { recordMatchHistory } from "@/lib/history";
 
 const Schema = z.discriminatedUnion("action", [
+  // Zhol / Card actions
   z.object({ action: z.literal("draw"), clientId: z.string(), source: z.enum(["stock", "discard"]) }),
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
+  // Cicmic (Mills) actions
+  z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
+  z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
+  z.object({ action: z.literal("cicmic_remove"), clientId: z.string(), point: z.number() }),
 ]);
 
 export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
@@ -32,7 +37,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       result = applyDiscard(room, seatIdx, parsed.data.cardId);
       break;
     case "gin":
+      case "gin":
       result = applyGin(room, seatIdx, parsed.data.cardId);
+      break;
+    // --- ADD CICMIC BRANCH ---
+    case "cicmic_place":
+    case "cicmic_move":
+    case "cicmic_remove":
+      // We will route these to your cicmic-logic engine here
+      // result = applyCicmicAction(room, seatIdx, parsed.data);
+      result = { ok: true }; 
       break;
   }
 
