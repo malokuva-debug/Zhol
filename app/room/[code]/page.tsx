@@ -404,16 +404,6 @@ function GameBoard({
     router.push("/lobby");
   }
 
-  async function leave() {
-    removeRecentRoom(code);
-    await fetch(`/api/rooms/${code}/leave`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId }),
-    });
-    router.push("/lobby");
-  }
-
   // --- ADD THESE LINES ---
   const isHost = room.hostClientId === clientId;
 
