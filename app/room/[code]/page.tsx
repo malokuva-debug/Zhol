@@ -307,8 +307,36 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 // ----------------------------------------------------------------------
 
 function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwordHash">; game: ClientGameState; yourSeat: number; code: string; }) {
+  const [optimisticBoard, setOptimisticBoard] = useState<Record<number, 1 | 2 | null>>(game.board || {});
+  const [error, setError] = useState("");
+
+  // Sync with server if the game state changes
+  useEffect(() => {
+    setOptimisticBoard(game.board || {});
+  }, [game.board]);
+
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
-  const board = game.board || {};
+  const myPlayerId = yourSeat === 0 ? 1 : 2; // Seat 0 is P1, Seat 1 is P2
+
+  async function handlePointClick(ptIdx: number) {
+    if (!isYourTurn || optimisticBoard[ptIdx]) return; // Block if not your turn or taken
+    setError("");
+
+    // 1. Optimistic Update (makes the circle instantly appear!)
+    setOptimisticBoard(prev => ({ ...prev, [ptIdx]: myPlayerId }));
+
+    // 2. Tell the server to lock it in
+    const res = await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId: getClientId(), action: "cicmic_place", point: ptIdx }),
+    });
+
+    if (!res.ok) {
+      setError((await res.json()).error);
+      setOptimisticBoard(game.board || {}); // Revert if server rejects it
+    }
+  }
 
   const POINTS = [
     { x: 10, y: 10 }, { x: 50, y: 10 }, { x: 90, y: 10 },
@@ -327,8 +355,9 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       <div className="text-center">
         <h2 className="text-2xl font-black text-glow-purple">Cicmic (Mills)</h2>
         <p className="text-white/60">
-          {isYourTurn ? (game.pendingRemoval ? "Remove an opponent's piece!" : "Your turn!") : "Waiting for opponent..."}
+          {isYourTurn ? (game.pendingRemoval ? "Remove an opponent's piece!" : "Your turn to place!") : "Waiting for opponent..."}
         </p>
+        {error && <p className="text-neon-pink text-sm mt-2">{error}</p>}
       </div>
 
       <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-xl border border-white/10 p-4">
@@ -343,20 +372,17 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
         </svg>
 
         {POINTS.map((pt, i) => {
-          const owner = board[i];
+          const owner = optimisticBoard[i];
           const isPlayer1 = owner === 1;
           
           return (
             <button
               key={i}
-              className={`absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 transition-transform hover:scale-125
-                ${owner ? (isPlayer1 ? "bg-neon-blue border-white" : "bg-neon-pink border-white") : "bg-black/50 border-white/30 hover:border-white"}
+              className={`absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 transition-all hover:scale-125
+                ${owner ? (isPlayer1 ? "bg-neon-blue border-white z-10" : "bg-neon-pink border-white z-10") : "bg-black/50 border-white/30 hover:border-white z-0"}
               `}
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
-              onClick={() => {
-                if (!isYourTurn) return;
-                console.log("Clicked point", i);
-              }}
+              onClick={() => handlePointClick(i)}
             />
           );
         })}
