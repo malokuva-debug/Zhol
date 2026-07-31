@@ -319,14 +319,23 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   const myPlayerId = yourSeat === 0 ? 1 : 2;
   const enemyPlayerId = myPlayerId === 1 ? 2 : 1;
 
+  // Board Piece Counts
   const p1BoardCount = Object.values(optimisticBoard).filter((v) => v === 1).length;
   const p2BoardCount = Object.values(optimisticBoard).filter((v) => v === 2).length;
 
   const myBoardCount = myPlayerId === 1 ? p1BoardCount : p2BoardCount;
   const enemyBoardCount = enemyPlayerId === 1 ? p1BoardCount : p2BoardCount;
 
-  const myUnplaced = Math.max(0, 9 - myBoardCount);
-  const enemyUnplaced = Math.max(0, 9 - enemyBoardCount);
+  // Total initial pieces per player in Nine Men's Morris
+  const TOTAL_PIECES = 9;
+
+  // We infer unplaced pieces based on board state (assumes pieces placed turn-by-turn up to 9 each)
+  const myUnplaced = Math.max(0, TOTAL_PIECES - myBoardCount);
+  const enemyUnplaced = Math.max(0, TOTAL_PIECES - enemyBoardCount);
+
+  // Remaining pieces lost/captured
+  const myLost = TOTAL_PIECES - (myBoardCount + myUnplaced);
+  const enemyLost = TOTAL_PIECES - (enemyBoardCount + enemyUnplaced);
 
   const isPlacementPhase = myUnplaced > 0 || enemyUnplaced > 0;
   const isFlying = myBoardCount === 3 && !isPlacementPhase;
@@ -339,6 +348,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     if (!isYourTurn) return;
     setError("");
 
+    // --- REMOVAL MODE ---
     if (isPendingRemoval) {
       if (optimisticBoard[ptIdx] !== enemyPlayerId) {
         setError("Click an opponent's piece to remove it!");
@@ -360,9 +370,10 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       return;
     }
 
+    // --- PLACEMENT MODE ---
     if (isPlacementPhase) {
       if (myUnplaced === 0) {
-        setError("You have placed all 9 pieces! Waiting for opponent.");
+        setError("You have placed all 9 pieces! Waiting for opponent to finish placing.");
         return;
       }
       if (optimisticBoard[ptIdx]) return;
@@ -382,11 +393,12 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       return;
     }
 
+    // --- MOVEMENT / FLYING MODE ---
     if (selectedFrom === null) {
       if (optimisticBoard[ptIdx] === myPlayerId) {
         setSelectedFrom(ptIdx);
       } else {
-        setError("Click one of your pieces to select it.");
+        setError("Click one of your pieces on the board to select it.");
       }
     } else {
       if (optimisticBoard[ptIdx] === myPlayerId) {
@@ -432,84 +444,154 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
   return (
     <div className="flex flex-col items-center gap-6">
+      
+      {/* DETAILED SCORE & PIECE INVENTORY DASHBOARD */}
       <div className="grid w-full max-w-lg grid-cols-2 gap-4">
-        <div className={`glass flex flex-col items-center rounded-2xl p-3 border-2 ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10" : "border-white/10"}`}>
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-neon-pink shadow-[0_0_8px_#ff5bc8]" />
-            <span className="font-bold text-white text-sm">{enemyNickname}</span>
+        
+        {/* ENEMY DASHBOARD */}
+        <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10 shadow-[0_0_15px_rgba(255,91,200,0.2)]" : "border-white/10"}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-neon-pink shadow-[0_0_8px_#ff5bc8]" />
+              <span className="font-bold text-white text-sm">{enemyNickname}</span>
+            </div>
+            {!isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-pink/20 text-neon-pink px-2 py-0.5 rounded-full animate-pulse">Turn</span>}
           </div>
-          <div className="mt-2 flex gap-4 text-xs">
+
+          {/* Visual Piece Inventory Tray */}
+          <div className="flex gap-1 justify-between my-2 bg-black/30 p-2 rounded-xl border border-white/5">
+            {Array.from({ length: TOTAL_PIECES }).map((_, idx) => {
+              const isPlaced = idx < enemyBoardCount;
+              const isUnplaced = idx < enemyBoardCount + enemyUnplaced && !isPlaced;
+              return (
+                <div
+                  key={idx}
+                  className={`h-4 w-4 rounded-full border transition-all ${
+                    isPlaced
+                      ? "bg-neon-pink border-white shadow-[0_0_6px_#ff5bc8]"
+                      : isUnplaced
+                      ? "bg-neon-pink/40 border-neon-pink/60"
+                      : "bg-black/50 border-white/10 opacity-30" // Lost/captured
+                  }`}
+                  title={isPlaced ? "On Board" : isUnplaced ? "To Place" : "Captured"}
+                />
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1 text-white/60">
             <div>
-              <span className="block text-white/40">On Board</span>
-              <span className="font-extrabold text-neon-pink text-base">{enemyBoardCount}</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Board</span>
+              <span className="font-extrabold text-neon-pink text-sm">{enemyBoardCount}</span>
             </div>
             <div>
-              <span className="block text-white/40">To Place</span>
-              <span className="font-extrabold text-white text-base">{enemyUnplaced}</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Reserve</span>
+              <span className="font-extrabold text-white text-sm">{enemyUnplaced}</span>
+            </div>
+            <div>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Lost</span>
+              <span className="font-extrabold text-red-400 text-sm">{enemyLost}</span>
             </div>
           </div>
         </div>
 
-        <div className={`glass flex flex-col items-center rounded-2xl p-3 border-2 ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10" : "border-white/10"}`}>
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-neon-blue shadow-[0_0_8px_#4dd8ff]" />
-            <span className="font-bold text-white text-sm">You</span>
+        {/* YOUR DASHBOARD */}
+        <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10 shadow-[0_0_15px_rgba(77,216,255,0.2)]" : "border-white/10"}`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-neon-blue shadow-[0_0_8px_#4dd8ff]" />
+              <span className="font-bold text-white text-sm">You</span>
+            </div>
+            {isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-blue/20 text-neon-blue-soft px-2 py-0.5 rounded-full animate-pulse">Your Turn</span>}
           </div>
-          <div className="mt-2 flex gap-4 text-xs">
+
+          {/* Visual Piece Inventory Tray */}
+          <div className="flex gap-1 justify-between my-2 bg-black/30 p-2 rounded-xl border border-white/5">
+            {Array.from({ length: TOTAL_PIECES }).map((_, idx) => {
+              const isPlaced = idx < myBoardCount;
+              const isUnplaced = idx < myBoardCount + myUnplaced && !isPlaced;
+              return (
+                <div
+                  key={idx}
+                  className={`h-4 w-4 rounded-full border transition-all ${
+                    isPlaced
+                      ? "bg-neon-blue border-white shadow-[0_0_6px_#4dd8ff]"
+                      : isUnplaced
+                      ? "bg-neon-blue/40 border-neon-blue/60"
+                      : "bg-black/50 border-white/10 opacity-30" // Lost/captured
+                  }`}
+                  title={isPlaced ? "On Board" : isUnplaced ? "To Place" : "Captured"}
+                />
+              );
+            })}
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1 text-white/60">
             <div>
-              <span className="block text-white/40">On Board</span>
-              <span className="font-extrabold text-neon-blue-soft text-base">{myBoardCount}</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Board</span>
+              <span className="font-extrabold text-neon-blue-soft text-sm">{myBoardCount}</span>
             </div>
             <div>
-              <span className="block text-white/40">To Place</span>
-              <span className="font-extrabold text-white text-base">{myUnplaced}</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Reserve</span>
+              <span className="font-extrabold text-white text-sm">{myUnplaced}</span>
+            </div>
+            <div>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">Lost</span>
+              <span className="font-extrabold text-red-400 text-sm">{myLost}</span>
             </div>
           </div>
         </div>
+
       </div>
 
-      <div className="text-center">
-        <p className="text-sm font-semibold">
-          {isYourTurn ? (
-            isPendingRemoval ? (
-              <span className="animate-pulse-glow rounded-full bg-neon-pink/20 px-4 py-1 text-neon-pink font-bold">
-                💥 3-IN-A-ROW! Click an opponent's piece to remove it!
-              </span>
-            ) : isPlacementPhase ? (
-              <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
-                Your turn to place! ({myUnplaced} left)
-              </span>
-            ) : isFlying ? (
-              <span className="animate-pulse-glow rounded-full bg-neon-purple/20 px-4 py-1 text-neon-purple-soft font-bold">
-                🦅 FLYING PHASE! Move any piece to any open spot!
-              </span>
-            ) : selectedFrom !== null ? (
-              <span className="animate-pulse-glow rounded-full bg-neon-blue/20 px-4 py-1 text-neon-blue-soft font-bold">
-                Piece selected — Click an adjacent open spot to move
-              </span>
-            ) : (
-              <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
-                Your turn — Click your piece to move it
-              </span>
-            )
+      {/* GAME PHASE INSTRUCTION BANNER */}
+      <div className="text-center min-h-[40px] flex items-center justify-center">
+        {isYourTurn ? (
+          isPendingRemoval ? (
+            <span className="animate-pulse-glow rounded-full bg-neon-pink/20 px-5 py-1.5 text-neon-pink font-extrabold text-sm border border-neon-pink/40 shadow-lg">
+              💥 3-IN-A-ROW! Click an opponent's piece to remove it!
+            </span>
+          ) : isPlacementPhase ? (
+            <span className="animate-pulse-glow rounded-full bg-neon-blue/15 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/30">
+              Placement Phase — Click an empty point to place ({myUnplaced} in reserve)
+            </span>
+          ) : isFlying ? (
+            <span className="animate-pulse-glow rounded-full bg-neon-purple/20 px-5 py-1.5 text-neon-purple-soft font-extrabold text-sm border border-neon-purple/40">
+              🦅 FLYING PHASE! Click any piece, then click ANY open point!
+            </span>
+          ) : selectedFrom !== null ? (
+            <span className="animate-pulse-glow rounded-full bg-neon-blue/20 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/40">
+              Piece Selected — Click an adjacent empty point to move
+            </span>
           ) : (
-            <span className="text-white/40">Waiting for {enemyNickname}...</span>
-          )}
-        </p>
-        {error && <p className="text-neon-pink text-sm mt-2 font-bold">{error}</p>}
+            <span className="animate-pulse-glow rounded-full bg-neon-blue/15 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/30">
+              Movement Phase — Click one of your pieces to select it
+            </span>
+          )
+        ) : (
+          <span className="text-white/40 font-medium text-sm">Waiting for {enemyNickname}'s move...</span>
+        )}
       </div>
 
-      <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-xl border border-white/10 p-4 shadow-2xl">
+      {error && <p className="text-neon-pink text-sm font-bold bg-neon-pink/10 px-4 py-1 rounded-lg border border-neon-pink/30">{error}</p>}
+
+      {/* THE BOARD */}
+      <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple">
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
+          {/* Outer Square */}
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
+          {/* Middle Square */}
           <rect x="25%" y="25%" width="50%" height="50%" fill="none" />
+          {/* Inner Square */}
           <rect x="40%" y="40%" width="20%" height="20%" fill="none" />
+          {/* Connecting Cross Lines */}
           <line x1="50%" y1="10%" x2="50%" y2="40%" />
           <line x1="50%" y1="60%" x2="50%" y2="90%" />
           <line x1="10%" y1="50%" x2="40%" y2="50%" />
           <line x1="60%" y1="50%" x2="90%" y2="50%" />
         </svg>
 
+        {/* The 24 Intersecting Points */}
         {POINTS.map((pt, i) => {
           const owner = optimisticBoard[i];
           const isPlayer1 = owner === 1;
@@ -518,9 +600,15 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           return (
             <button
               key={i}
-              className={`absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 transition-all hover:scale-125
-                ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-20" : ""}
-                ${owner ? (isPlayer1 ? "bg-neon-blue border-white z-10 shadow-[0_0_10px_#4dd8ff]" : "bg-neon-pink border-white z-10 shadow-[0_0_10px_#ff5bc8]") : "bg-black/50 border-white/30 hover:border-white z-0"}
+              className={`absolute w-9 h-9 -ml-4.5 -mt-4.5 rounded-full border-2 transition-all duration-150 hover:scale-125
+                ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-20 shadow-[0_0_15px_#facc15]" : ""}
+                ${
+                  owner
+                    ? isPlayer1
+                      ? "bg-neon-blue border-white z-10 shadow-[0_0_12px_#4dd8ff]"
+                      : "bg-neon-pink border-white z-10 shadow-[0_0_12px_#ff5bc8]"
+                    : "bg-black/60 border-white/30 hover:border-white hover:bg-white/10 z-0"
+                }
               `}
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
               onClick={() => handlePointClick(i)}
