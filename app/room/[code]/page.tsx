@@ -41,7 +41,7 @@ export default function RoomPage() {
     setNicknameState(n);
     setClientId(getClientId());
   }, [router]);
-  
+
   const { data, error } = useLiveData<StateResponse>(
     clientId ? `/api/rooms/${code}/state?clientId=${clientId}` : null,
     roomChannel(code),
@@ -49,7 +49,6 @@ export default function RoomPage() {
     2500
   );
 
-  // 1. The original auto-join logic (untouched)
   useEffect(() => {
     if (!data || !nickname || !clientId) return;
     if (data.yourSeat !== null) return;
@@ -65,10 +64,9 @@ export default function RoomPage() {
     }).finally(() => setJoining(false));
   }, [data, nickname, clientId, code, joining]);
 
-  // 2. The NEW local memory logic in its own separate effect
   useEffect(() => {
     if (data && data.room) {
-      addRecentRoom(code); // Save to local storage on successful load
+      addRecentRoom(code);
     }
   }, [data, code]);
 
@@ -84,7 +82,7 @@ export default function RoomPage() {
   }
 
   if (!data) {
-    return <main className="flex min-h-screen items-center justify-center text-white/40">Loading table </main>;
+    return <main className="flex min-h-screen items-center justify-center text-white/40">Loading table...</main>;
   }
 
   const { room, yourSeat, game } = data;
@@ -125,15 +123,12 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
 
   async function handleDeleteRoom() {
     if (!confirm("Are you sure you want to completely delete this room? This will kick everyone out.")) return;
-
     removeRecentRoom(room.code);
-
     await fetch(`/api/rooms/${room.code}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
     });
-
     router.push("/lobby");
   }
 
@@ -163,17 +158,7 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
   );
 }
 
-function WaitingRoom({
-  room,
-  yourSeat,
-  clientId,
-  code,
-}: {
-  room: Omit<Room, "passwordHash">;
-  yourSeat: number | null;
-  clientId: string;
-  code: string;
-}) {
+function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "passwordHash">; yourSeat: number | null; clientId: string; code: string; }) {
   const router = useRouter();
   const isHost = room.hostClientId === clientId;
 
@@ -236,7 +221,7 @@ function WaitingRoom({
         <span className="glass rounded-full px-3 py-1">
           Timer: {room.rules.turnTimerSeconds ? `${room.rules.turnTimerSeconds}s` : "Off"}
         </span>
-        <span className="glass rounded-full px-3 py-1">Gin only   no knock</span>
+        <span className="glass rounded-full px-3 py-1">Gin only — no knock</span>
         <span className="glass rounded-full px-3 py-1">
           {room.maxPlayers >= 3 ? "2 decks + 2 jokers" : "1 deck + 2 jokers"}
         </span>
@@ -294,14 +279,27 @@ function GameBoard({
   const clientId = getClientId();
   const you = room.seats[yourSeat];
 
+  // OPTIMISTIC UI STATE
+  const [optimisticGame, setOptimisticGame] = useState<ClientGameState | null>(null);
+  
+  // Sync the optimistic state with the server whenever the server provides a new confirmed state
+  useEffect(() => {
+    setOptimisticGame(game);
+  }, [game]);
+
+  const displayGame = optimisticGame || game;
+
   const discardRef = useRef<HTMLDivElement>(null);
   const ginRef = useRef<HTMLButtonElement>(null);
 
-  const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
-  const canAct = isYourTurn && game.turnPhase === "discard";
+  const isYourTurn = displayGame.turnIdx === yourSeat && !displayGame.matchOver;
+  const canAct = isYourTurn && displayGame.turnPhase === "discard";
 
-  const deadwoodInfo = useMemo(() => minimizeDeadwood(game.yourHand), [game.yourHand]);
-  const jokersInHand = useMemo(() => game.yourHand.filter(isJokerId), [game.yourHand]);
+  // Filter out any optimistic placeholder cards before passing hand to the engine
+  const playableHand = displayGame.yourHand.filter((id) => id !== "__DRAWING__");
+
+  const deadwoodInfo = useMemo(() => minimizeDeadwood(playableHand), [playableHand]);
+  const jokersInHand = useMemo(() => playableHand.filter(isJokerId), [playableHand]);
 
   const resolvedMelds = useMemo(
     () => resolveJokerPlaceholders(deadwoodInfo.melds, jokersInHand),
@@ -316,14 +314,48 @@ function GameBoard({
 
   async function sendMove(body: Record<string, unknown>) {
     setActionError("");
+
+    // --- APPLY OPTIMISTIC STATE MUTATION ---
+    const next = { ...displayGame };
+    const action = body.action as string;
+    const cardId = body.cardId as string;
+    const source = body.source as string;
+
+    if (action === "discard" || action === "gin") {
+      next.yourHand = next.yourHand.filter((c) => c !== cardId);
+      next.discard = [...next.discard, cardId];
+      next.discardTop = cardId;
+      next.turnPhase = action === "gin" ? "round_over" : "draw";
+      if (action === "discard") {
+        next.turnIdx = -1; // Instantly drop the 'Your Turn' badge
+      }
+    } else if (action === "draw" && source === "discard") {
+      if (next.discardTop) {
+        next.yourHand = [...next.yourHand, next.discardTop];
+        next.discard = next.discard.slice(0, -1);
+        next.discardTop = next.discard.length > 0 ? next.discard[next.discard.length - 1] : null;
+      }
+      next.turnPhase = "discard";
+    } else if (action === "draw" && source === "stock") {
+      next.deckCount = Math.max(0, next.deckCount - 1);
+      next.yourHand = [...next.yourHand, "__DRAWING__"]; // Inject placeholder so hand fans out immediately
+      next.turnPhase = "discard";
+    }
+
+    setOptimisticGame(next);
+    setSelectedCard(null);
+    // --- END OPTIMISTIC UI ---
+
     const res = await fetch(`/api/rooms/${code}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, ...body }),
     });
     const json = await res.json();
-    if (!res.ok) setActionError(json.error || "Move failed.");
-    setSelectedCard(null);
+    if (!res.ok) {
+      setActionError(json.error || "Move failed.");
+      setOptimisticGame(game); // rollback on error
+    }
   }
 
   async function leave() {
@@ -346,7 +378,7 @@ function GameBoard({
       return x >= rect.left - 20 && x <= rect.right + 20 && y >= rect.top - 20 && y <= rect.bottom + 20;
     };
 
-    const achievesGin = canGin(game.yourHand.filter((c) => c !== cardId));
+    const achievesGin = canGin(playableHand.filter((c) => c !== cardId));
 
     if (checkZone(ginRef)) {
       if (achievesGin) {
@@ -364,34 +396,34 @@ function GameBoard({
   };
 
   const autoGinDiscard = useMemo(
-    () => (canAct && game.yourHand.length === 11 ? findGinDiscard(game.yourHand) : null),
-    [canAct, game.yourHand]
+    () => (canAct && playableHand.length === 11 ? findGinDiscard(playableHand) : null),
+    [canAct, playableHand]
   );
-  const selectedAchievesGin = canAct && !!selectedCard && canGin(game.yourHand.filter((c) => c !== selectedCard));
+  const selectedAchievesGin = canAct && !!selectedCard && canGin(playableHand.filter((c) => c !== selectedCard));
   const ginDiscardCard = selectedAchievesGin ? selectedCard : autoGinDiscard;
   const canDeclareGin = canAct && !!ginDiscardCard;
 
-  const activeOpponents = game.opponents.filter((o) => !o.eliminated);
-  const turnPlayerName = game.turnIdx === yourSeat ? "you" : room.seats[game.turnIdx]?.nickname ?? "opponent";
+  const activeOpponents = displayGame.opponents.filter((o) => !o.eliminated);
+  const turnPlayerName = displayGame.turnIdx === yourSeat ? "you" : room.seats[displayGame.turnIdx]?.nickname ?? "opponent";
 
   const prevRoundRef = useRef<number | null>(null);
   const [dealState, setDealState] = useState<{ round: number; targets: DealTarget[] } | null>(null);
   const [showingScore, setShowingScore] = useState(false);
 
   useEffect(() => {
-    if (prevRoundRef.current === null || game.roundNumber !== prevRoundRef.current) {
+    if (prevRoundRef.current === null || displayGame.roundNumber !== prevRoundRef.current) {
       const isFirstLoad = prevRoundRef.current === null;
-      prevRoundRef.current = game.roundNumber;
+      prevRoundRef.current = displayGame.roundNumber;
 
       const activeSeatIndices = room.seats
         .map((s, i) => (s && !s.eliminated ? i : -1))
         .filter((i) => i !== -1);
       const starterSeat =
-        activeSeatIndices.length > 0 ? activeSeatIndices[game.roundNumber % activeSeatIndices.length] : yourSeat;
+        activeSeatIndices.length > 0 ? activeSeatIndices[displayGame.roundNumber % activeSeatIndices.length] : yourSeat;
 
       const targets: DealTarget[] = [
         { seatIdx: yourSeat, nickname: you?.nickname ?? "You", isYou: true, finalCount: yourSeat === starterSeat ? 11 : 10 },
-        ...game.opponents
+        ...displayGame.opponents
           .filter((o) => !o.eliminated)
           .map((o) => ({
             seatIdx: o.seatIdx,
@@ -401,36 +433,36 @@ function GameBoard({
           })),
       ];
 
-      if (!isFirstLoad && game.lastRoundEnd) {
+      if (!isFirstLoad && displayGame.lastRoundEnd) {
         setShowingScore(true);
         const timer = setTimeout(() => {
           setShowingScore(false);
-          if (!game.matchOver) {
-            setDealState({ round: game.roundNumber, targets });
+          if (!displayGame.matchOver) {
+            setDealState({ round: displayGame.roundNumber, targets });
           }
         }, 5000);
         return () => clearTimeout(timer);
       } else {
         setShowingScore(false);
-        if (!game.matchOver) {
-          setDealState({ round: game.roundNumber, targets });
+        if (!displayGame.matchOver) {
+          setDealState({ round: displayGame.roundNumber, targets });
         }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.roundNumber]);
+  }, [displayGame.roundNumber]);
 
   return (
     <div className="relative space-y-4">
       <AnimatePresence>
-        {dealState && dealState.round === game.roundNumber && (
+        {dealState && dealState.round === displayGame.roundNumber && (
           <DealAnimation targets={dealState.targets} onComplete={() => setDealState(null)} />
         )}
       </AnimatePresence>
 
       <div className="relative h-48 sm:h-56">
-        {game.opponents.map((opp, i) => {
-          const pos = seatPosition(i, game.opponents.length);
+        {displayGame.opponents.map((opp, i) => {
+          const pos = seatPosition(i, displayGame.opponents.length);
           return (
             <div
               key={opp.seatIdx}
@@ -443,7 +475,7 @@ function GameBoard({
                 cardCount={opp.cardCount}
                 score={opp.score}
                 eliminated={opp.eliminated}
-                isTurn={game.turnIdx === opp.seatIdx}
+                isTurn={displayGame.turnIdx === opp.seatIdx}
                 faceDown
               />
               {!opp.eliminated && (
@@ -459,9 +491,9 @@ function GameBoard({
       <div className="felt-table relative rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div className="text-xs text-white/50">
-            Round {game.roundNumber}   Elimination at {room.rules.eliminationScore}   {activeOpponents.length + 1} still in
+            Round {displayGame.roundNumber} • Elimination at {room.rules.eliminationScore} • {activeOpponents.length + 1} still in
           </div>
-          <TurnTimer startedAt={game.turnStartedAt} seconds={game.turnTimerSeconds} active={!game.matchOver} />
+          <TurnTimer startedAt={displayGame.turnStartedAt} seconds={displayGame.turnTimerSeconds} active={!displayGame.matchOver} />
         </div>
 
         <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
@@ -469,27 +501,23 @@ function GameBoard({
           <div className="flex items-center justify-center gap-6 sm:gap-12">
             {/* Stock Pile */}
             <div className="relative">
-              {/* Fake under-cards to give the deck thickness */}
-              {game.deckCount > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
-              {game.deckCount > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
+              {displayGame.deckCount > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
+              {displayGame.deckCount > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
               
               <motion.button
-                drag={isYourTurn && game.turnPhase === "draw" ? true : false}
+                drag={isYourTurn && displayGame.turnPhase === "draw" ? true : false}
                 dragSnapToOrigin
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
                 onDragEnd={(e, info) => {
-                  // If the user drags the card downwards toward their hand, draw it
-                  if (info.offset.y > 60) {
-                    sendMove({ action: "draw", source: "stock" });
-                  }
+                  if (info.offset.y > 60) sendMove({ action: "draw", source: "stock" });
                 }}
-                disabled={!isYourTurn || game.turnPhase !== "draw"}
+                disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
                 onClick={() => sendMove({ action: "draw", source: "stock" })}
                 className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <PlayingCard id={null} faceDown />
                 <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                  {game.deckCount}
+                  {displayGame.deckCount}
                 </span>
               </motion.button>
             </div>
@@ -497,21 +525,19 @@ function GameBoard({
             {/* Discard Pile */}
             <div className="relative">
               <motion.button
-                drag={isYourTurn && game.turnPhase === "draw" && game.discardTop ? true : false}
+                drag={isYourTurn && displayGame.turnPhase === "draw" && displayGame.discardTop ? true : false}
                 dragSnapToOrigin
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
                 onDragEnd={(e, info) => {
-                  // If the user drags the card downwards toward their hand, draw it
-                  if (info.offset.y > 60) {
-                    sendMove({ action: "draw", source: "discard" });
-                  }
+                  if (info.offset.y > 60) sendMove({ action: "draw", source: "discard" });
                 }}
-                disabled={!isYourTurn || game.turnPhase !== "draw" || !game.discardTop}
+                disabled={!isYourTurn || displayGame.turnPhase !== "draw" || !displayGame.discardTop}
                 onClick={() => sendMove({ action: "draw", source: "discard" })}
                 className="relative z-10 disabled:cursor-not-allowed"
               >
-                {game.discardTop ? (
-                  <PlayingCard id={game.discardTop} />
+                {displayGame.discardTop ? (
+                  {/* Passing layoutId seamlessly connects the hand to the discard pile! */}
+                  <PlayingCard id={displayGame.discardTop} layoutId={`card-${displayGame.discardTop}`} />
                 ) : (
                   <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem]" />
                 )}
@@ -519,10 +545,9 @@ function GameBoard({
             </div>
           </div>
 
-          {/* Decorative history of prior discards, off to the right */}
-          {game.discard.length > 1 && (
+          {displayGame.discard.length > 1 && (
             <div className="hidden items-end sm:flex" style={{ height: "7rem" }}>
-              {game.discard.slice(0, -1).slice(-4).map((id, i, arr) => (
+              {displayGame.discard.slice(0, -1).slice(-4).map((id, i, arr) => (
                 <div
                   key={id + i}
                   style={{ marginLeft: i === 0 ? 0 : -40, transform: `rotate(${(i - arr.length / 2) * 3}deg)`, opacity: 0.55 }}
@@ -535,36 +560,36 @@ function GameBoard({
         </div>
 
         <div className={`text-center text-xs uppercase tracking-wider text-white/30 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
-          Draw Deck   Face-up Draw Card   Discard Pile 
+          Draw Deck • Face-up Draw Card • Discard Pile 
         </div>
 
         <div className={`mt-2 text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
-          {game.matchOver ? (
+          {displayGame.matchOver ? (
             <span className="text-neon-purple-soft">Match complete</span>
           ) : isYourTurn ? (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
-              Your turn   {game.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}
+              Your turn — {displayGame.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}
             </span>
           ) : (
-            <span className="text-white/40">Waiting for {turnPlayerName} </span>
+            <span className="text-white/40">Waiting for {turnPlayerName}...</span>
           )}
         </div>
 
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
 
         <AnimatePresence>
-          {showingScore && game.lastRoundEnd && <RoundEndReveal info={game.lastRoundEnd} room={room} roundKey={game.roundNumber} />}
+          {showingScore && displayGame.lastRoundEnd && <RoundEndReveal info={displayGame.lastRoundEnd} room={room} roundKey={displayGame.roundNumber} />}
         </AnimatePresence>
 
         <AnimatePresence>
-          {game.matchOver && !showingScore && <WinOverlay game={game} room={room} onExit={leave} />}
+          {displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}
         </AnimatePresence>
       </div>
 
       <div className="glass rounded-2xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-semibold text-white/70">
-            Your hand   Deadwood:{" "}
+            Your hand — Deadwood:{" "}
             <span className={deadwoodInfo.deadwood === 0 ? "text-neon-blue-soft" : "text-white"}>{deadwoodInfo.deadwood}</span>
           </span>
           <div className="flex flex-wrap gap-2">
@@ -578,7 +603,7 @@ function GameBoard({
         </div>
 
         <HandFan
-          cards={showingScore ? [] : game.yourHand}
+          cards={showingScore ? [] : displayGame.yourHand}
           selectedCard={selectedCard}
           onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
           interactive={canAct && !showingScore}
@@ -590,10 +615,10 @@ function GameBoard({
       <PlayerStrip
         nickname={you?.nickname ?? "You"}
         connected={!!you?.connected}
-        cardCount={game.yourHand.length}
+        cardCount={displayGame.yourHand.length}
         score={you?.score ?? 0}
         eliminated={you?.eliminated ?? false}
-        isTurn={game.turnIdx === yourSeat}
+        isTurn={displayGame.turnIdx === yourSeat}
       />
     </div>
   );
@@ -663,8 +688,8 @@ function PlayerStrip({
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
         {eliminated && <span className="text-xs text-neon-pink">eliminated</span>}
-        {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting </span>}
-        {faceDown && !eliminated && <span className="text-xs text-white/40">  {cardCount} cards</span>}
+        {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting...</span>}
+        {faceDown && !eliminated && <span className="text-xs text-white/40">• {cardCount} cards</span>}
       </div>
       <ScoreBadge score={score} className="text-lg text-neon-blue-soft" />
     </div>
@@ -681,7 +706,7 @@ function WinOverlay({ game, room, onExit }: { game: ClientGameState; room: Omit<
     >
       <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", bounce: 0.5 }} className="text-center">
         <div className="mb-1 text-xs uppercase tracking-[0.3em] text-neon-blue-soft">Match Over</div>
-        <div className="text-4xl font-black text-glow-purple">{winner} Wins!  </div>
+        <div className="text-4xl font-black text-glow-purple">{winner} Wins! 🏆</div>
         <div className="mt-2 space-y-0.5 text-sm text-white/60">
           {room.seats.filter(Boolean).map((s, i) => (
             <div key={i}>
