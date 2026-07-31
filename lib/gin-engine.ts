@@ -189,16 +189,17 @@ function candidateJokerMelds(cards: Card[], jokersAvailable: number): RealMeld[]
       }
       if (cur.length) chains.push(cur);
 
-      // Extend ANY contiguous sub-chain (length >= 1) by 1 or 2 jokers at
-      // either end (or bracketing both ends) — this is what lets a joker
-      // complete a run of any length, e.g. 4 real cards + 1 joker = 5-run,
-      // not just a 2-card pair + 1 joker = 3-run.
+      // Extend ANY contiguous sub-chain by 1 or 2 jokers at either end (or
+      // bracketing both ends) — this is what lets a joker complete a run of
+      // any length, e.g. 4 real cards + 1 joker = 5-run. A run needs >= 3
+      // cards total, so a 1-joker extension needs a sub-chain of length >= 2
+      // (single real card + 1 joker = 2 cards is not a valid meld).
       for (const chain of chains) {
         for (let start = 0; start < chain.length; start++) {
           for (let len = 1; len <= chain.length - start; len++) {
             const sub = chain.slice(start, start + len);
             const ids = sub.map((c) => c.id);
-            if (jokersAvailable >= 1) {
+            if (jokersAvailable >= 1 && sub.length >= 2) {
               melds.push({ type: "run", cards: ["__JOKER__", ...ids], usesJoker: 1 });
               melds.push({ type: "run", cards: [...ids, "__JOKER__"], usesJoker: 1 });
             }
@@ -212,17 +213,27 @@ function candidateJokerMelds(cards: Card[], jokersAvailable: number): RealMeld[]
       }
 
       // Bridge two chains separated by exactly one missing rank, with 1 joker.
+      // Use every combination of a suffix of the left chain + the joker +
+      // a prefix of the right chain (not just the two adjacent endpoint
+      // cards) — e.g. 3H,4H | gap | 6H must be able to form the full 4-card
+      // run 3H-4H-JOKER-6H, not just 4H-JOKER-6H while stranding 3H.
       for (let i = 0; i < chains.length - 1; i++) {
         const left = chains[i];
         const right = chains[i + 1];
         const leftEndVal = numbering[left[left.length - 1].rank as Rank];
         const rightStartVal = numbering[right[0].rank as Rank];
-        if (rightStartVal - leftEndVal === 2 && jokersAvailable >= 1) {
-          melds.push({
-            type: "run",
-            cards: [left[left.length - 1].id, "__JOKER__", right[0].id],
-            usesJoker: 1,
-          });
+        if (rightStartVal - leftEndVal !== 2 || jokersAvailable < 1) continue;
+
+        for (let sufLen = 1; sufLen <= left.length; sufLen++) {
+          for (let preLen = 1; preLen <= right.length; preLen++) {
+            const suffix = left.slice(left.length - sufLen);
+            const prefix = right.slice(0, preLen);
+            melds.push({
+              type: "run",
+              cards: [...suffix.map((c) => c.id), "__JOKER__", ...prefix.map((c) => c.id)],
+              usesJoker: 1,
+            });
+          }
         }
       }
     }
