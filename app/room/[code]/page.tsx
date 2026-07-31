@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { getNickname, getClientId } from "@/lib/client-id";
+import { getNickname, getClientId, addRecentRoom, removeRecentRoom } from "@/lib/client-id";
 import { useLiveData } from "@/lib/use-live-data";
 import { roomChannel, EVENTS } from "@/lib/pusher";
 import type { Room, ClientGameState } from "@/lib/types";
@@ -41,7 +41,7 @@ export default function RoomPage() {
     setNicknameState(n);
     setClientId(getClientId());
   }, [router]);
-
+  
   const { data, error } = useLiveData<StateResponse>(
     clientId ? `/api/rooms/${code}/state?clientId=${clientId}` : null,
     roomChannel(code),
@@ -49,6 +49,7 @@ export default function RoomPage() {
     2500
   );
 
+  // 1. The original auto-join logic (untouched)
   useEffect(() => {
     if (!data || !nickname || !clientId) return;
     if (data.yourSeat !== null) return;
@@ -63,6 +64,13 @@ export default function RoomPage() {
       body: JSON.stringify({ nickname, clientId }),
     }).finally(() => setJoining(false));
   }, [data, nickname, clientId, code, joining]);
+
+  // 2. The NEW local memory logic in its own separate effect
+  useEffect(() => {
+    if (data && data.room) {
+      addRecentRoom(code); // Save to local storage on successful load
+    }
+  }, [data, code]);
 
   if (error) {
     return (
@@ -117,6 +125,8 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
 
   async function handleDeleteRoom() {
     if (!confirm("Are you sure you want to completely delete this room? This will kick everyone out.")) return;
+
+    removeRecentRoom(room.code);
 
     await fetch(`/api/rooms/${room.code}/delete`, {
       method: "POST",
@@ -190,6 +200,7 @@ function WaitingRoom({
   }
 
   async function leave() {
+    removeRecentRoom(code);
     await fetch(`/api/rooms/${code}/leave`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -316,6 +327,7 @@ function GameBoard({
   }
 
   async function leave() {
+    removeRecentRoom(code);
     await fetch(`/api/rooms/${code}/leave`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
