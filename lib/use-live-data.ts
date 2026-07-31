@@ -1,52 +1,71 @@
-"use client";
+import { useState, useEffect, useRef } from "react";
+import Pusher from "pusher-js";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { usePusherEvent, isRealtimeConfigured } from "./use-pusher";
-
-/**
- * Fetches `url` and keeps the result fresh via Pusher push events on
- * `channel`/`event`. Also polls every `pollMs` as a safety net (and as the
- * sole update mechanism if Pusher env vars aren't set yet, e.g. first local run).
- */
 export function useLiveData<T>(
   url: string | null,
-  channel: string | null,
-  event: string,
-  pollMs = 4000
+  channelName: string,
+  eventName: string,
+  pollIntervalMs = 2500
 ) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const urlRef = useRef(url);
-  urlRef.current = url;
-
-  const refetch = useCallback(async () => {
-    if (!urlRef.current) return;
-    try {
-      const res = await fetch(urlRef.current, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || "Request failed.");
-        return;
-      }
-      setError(null);
-      setData(json);
-    } catch {
-      setError("Connection issue — retrying…");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  usePusherEvent(channel, event, refetch);
+  const isDeadRef = useRef(false);
 
   useEffect(() => {
     if (!url) return;
-    refetch();
-    const effectivePoll = isRealtimeConfigured() ? pollMs * 3 : pollMs; // still poll lightly even with realtime, as a safety net
-    const id = setInterval(refetch, effectivePoll);
-    return () => clearInterval(id);
-  }, [url, pollMs, refetch]);
+    isDeadRef.current = false;
 
-  return { data, error, loading, refetch };
+    async function fetchData() {
+      if (isDeadRef.current) return;
+      try {
+        const res = await fetch(url!);
+        if (res.status === 404) {
+          isDeadRef.current = true;
+          setError("404 Room not found");
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to sync room data.");
+        }
+        const json = await res.json();
+        setData(json);
+        setError(null);
+      } catch (e) {
+        if (!isDeadRef.current) {
+          setError(e instanceof Error ? e.message : "Sync error.");
+        }
+      }
+    }
+
+    fetchData();
+
+    const interval = setInterval(() => {
+      if (!isDeadRef.current) {
+        fetchData();
+      }
+    }, pollIntervalMs);
+
+    let channel: any = null;
+    let pusher: Pusher | null = null;
+
+    if (process.env.NEXT_PUBLIC_PUSHER_KEY && process.env.NEXT_PUBLIC_PUSHER_CLUSTER) {
+      pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+        cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER,
+      });
+
+      channel = pusher.subscribe(channelName);
+      channel.bind(eventName, () => {
+        if (!isDeadRef.current) fetchData();
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel) channel.unbind_all();
+      if (pusher) pusher.unsubscribe(channelName);
+    };
+  }, [url, channelName, eventName, pollIntervalMs]);
+
+  return { data, error };
 }
