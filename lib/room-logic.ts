@@ -42,7 +42,7 @@ export function newRoom(opts: {
     seats,
     rules: {
       gameMode: opts.rules.gameMode,
-      teamMode: opts.rules.teamMode || "free",
+      teamMode: opts.rules.teamMode,
       ginBonuses: { gin: 25, bigGin: 50, superGin: 100 },
       eliminationScore: opts.rules.eliminationScore,
       turnTimerSeconds: opts.rules.turnTimerSeconds,
