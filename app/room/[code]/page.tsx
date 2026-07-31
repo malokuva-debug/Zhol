@@ -565,8 +565,8 @@ function GameBoard({
           <div className="flex items-center justify-center gap-6 sm:gap-12">
             {/* Stock Pile */}
             <div className="relative">
-              {displayGame.deckCount > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
-              {displayGame.deckCount > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
+              {displayGame.deck.length > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
+              {displayGame.deck.length > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
               
               <motion.button
                 drag={isYourTurn && displayGame.turnPhase === "draw" ? true : false}
