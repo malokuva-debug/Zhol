@@ -1,7 +1,5 @@
 export type CicmicPlayer = 1 | 2;
 
-// The 24 points on the board.
-// Outer square: 0-7 | Middle square: 8-15 | Inner square: 16-23
 export const CICMIC_MILLS = [
   // Outer Square
   [0, 1, 2], [2, 3, 4], [4, 5, 6], [6, 7, 0],
@@ -13,7 +11,6 @@ export const CICMIC_MILLS = [
   [1, 9, 17], [3, 11, 19], [5, 13, 21], [7, 15, 23]
 ];
 
-// Which points can move to which other points
 export const CICMIC_ADJACENCY: Record<number, number[]> = {
   0: [1, 7], 1: [0, 2, 9], 2: [1, 3], 3: [2, 4, 11],
   4: [3, 5], 5: [4, 6, 13], 6: [5, 7], 7: [0, 6, 15],
@@ -23,25 +20,17 @@ export const CICMIC_ADJACENCY: Record<number, number[]> = {
   20: [19, 21], 21: [13, 20, 22], 22: [21, 23], 23: [15, 16, 22]
 };
 
-/**
- * Checks if a newly placed/moved piece forms a new Mill.
- */
+/** Checks if placing/moving a piece to `point` completes a Mill for `player` */
 export function formsMill(
   board: Record<number, CicmicPlayer | null>,
   point: number,
   player: CicmicPlayer
 ): boolean {
-  // Find all possible mills that include this specific point
-  const possibleMills = CICMIC_MILLS.filter(mill => mill.includes(point));
-  
-  // Check if any of those mills are entirely owned by the player
-  return possibleMills.some(mill => mill.every(p => board[p] === player));
+  const possibleMills = CICMIC_MILLS.filter((mill) => mill.includes(point));
+  return possibleMills.some((mill) => mill.every((p) => board[p] === player));
 }
 
-/**
- * Checks if a player has any pieces that are NOT currently in a Mill.
- * (You cannot remove a piece from an opponent's Mill unless they have no other pieces available).
- */
+/** Checks if a player has any piece that is NOT in a Mill */
 export function hasNonMillPieces(
   board: Record<number, CicmicPlayer | null>,
   player: CicmicPlayer
@@ -49,6 +38,25 @@ export function hasNonMillPieces(
   for (let i = 0; i < 24; i++) {
     if (board[i] === player && !formsMill(board, i, player)) {
       return true;
+    }
+  }
+  return false;
+}
+
+/** Checks if a player has any legal moves available in Phase 2 */
+export function hasLegalMoves(
+  board: Record<number, CicmicPlayer | null>,
+  player: CicmicPlayer,
+  isFlying: boolean
+): boolean {
+  if (isFlying) return Object.values(board).some((v) => v === null);
+
+  for (let i = 0; i < 24; i++) {
+    if (board[i] === player) {
+      const neighbors = CICMIC_ADJACENCY[i] || [];
+      if (neighbors.some((n) => board[n] === null)) {
+        return true;
+      }
     }
   }
   return false;
