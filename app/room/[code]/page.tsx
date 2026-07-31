@@ -99,7 +99,7 @@ export default function RoomPage() {
   }
 
   const { room, yourSeat, game } = data;
-  const gameMode = room.rules.gameMode || "zhol"; // Fallback to zhol if older room
+  const gameMode = room.rules.gameMode || "zhol";
 
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
@@ -109,7 +109,6 @@ export default function RoomPage() {
       
       {room.status !== "waiting" && game && yourSeat !== null && (
         <>
-          {/* BRANCH THE UI BASED ON GAME MODE */}
           {gameMode === "cicmic" ? (
             <CicmicBoard room={room} game={game} yourSeat={yourSeat} code={code} />
           ) : gameMode === "pishpirik" ? (
@@ -308,49 +307,114 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 
 function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwordHash">; game: ClientGameState; yourSeat: number; code: string; }) {
   const [optimisticBoard, setOptimisticBoard] = useState<Record<number, 1 | 2 | null>>(game.board || {});
+  const [selectedFrom, setSelectedFrom] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  // Sync with server if the game state changes
   useEffect(() => {
     setOptimisticBoard(game.board || {});
-  }, [game.board]);
+    setSelectedFrom(null);
+  }, [game.board, game.turnIdx]);
 
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
-  const myPlayerId = yourSeat === 0 ? 1 : 2; 
+  const myPlayerId = yourSeat === 0 ? 1 : 2;
   const enemyPlayerId = myPlayerId === 1 ? 2 : 1;
 
-  // Calculate pieces on the board for each player
   const p1BoardCount = Object.values(optimisticBoard).filter((v) => v === 1).length;
   const p2BoardCount = Object.values(optimisticBoard).filter((v) => v === 2).length;
 
   const myBoardCount = myPlayerId === 1 ? p1BoardCount : p2BoardCount;
   const enemyBoardCount = enemyPlayerId === 1 ? p1BoardCount : p2BoardCount;
 
-  // Track unplaced pieces (9 initial pieces minus placed pieces)
   const myUnplaced = Math.max(0, 9 - myBoardCount);
   const enemyUnplaced = Math.max(0, 9 - enemyBoardCount);
 
-  // Find enemy nickname
+  const isPlacementPhase = myUnplaced > 0 || enemyUnplaced > 0;
+  const isFlying = myBoardCount === 3 && !isPlacementPhase;
+  const isPendingRemoval = game.pendingRemoval && isYourTurn;
+
   const enemySeatIdx = room.seats.findIndex((s, idx) => idx !== yourSeat && s !== null);
   const enemyNickname = enemySeatIdx !== -1 ? room.seats[enemySeatIdx]?.nickname : "Enemy";
 
   async function handlePointClick(ptIdx: number) {
-    if (!isYourTurn || optimisticBoard[ptIdx]) return; 
+    if (!isYourTurn) return;
     setError("");
 
-    // 1. Optimistic Update (makes the circle instantly appear!)
-    setOptimisticBoard(prev => ({ ...prev, [ptIdx]: myPlayerId }));
+    if (isPendingRemoval) {
+      if (optimisticBoard[ptIdx] !== enemyPlayerId) {
+        setError("Click an opponent's piece to remove it!");
+        return;
+      }
 
-    // 2. Lock it in with the server
-    const res = await fetch(`/api/rooms/${code}/move`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId: getClientId(), action: "cicmic_place", point: ptIdx }),
-    });
+      setOptimisticBoard((prev) => ({ ...prev, [ptIdx]: null }));
 
-    if (!res.ok) {
-      setError((await res.json()).error);
-      setOptimisticBoard(game.board || {}); // Revert if server rejects it
+      const res = await fetch(`/api/rooms/${code}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: getClientId(), action: "cicmic_remove", point: ptIdx }),
+      });
+
+      if (!res.ok) {
+        setError((await res.json()).error);
+        setOptimisticBoard(game.board || {});
+      }
+      return;
+    }
+
+    if (isPlacementPhase) {
+      if (myUnplaced === 0) {
+        setError("You have placed all 9 pieces! Waiting for opponent.");
+        return;
+      }
+      if (optimisticBoard[ptIdx]) return;
+
+      setOptimisticBoard((prev) => ({ ...prev, [ptIdx]: myPlayerId }));
+
+      const res = await fetch(`/api/rooms/${code}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: getClientId(), action: "cicmic_place", point: ptIdx }),
+      });
+
+      if (!res.ok) {
+        setError((await res.json()).error);
+        setOptimisticBoard(game.board || {});
+      }
+      return;
+    }
+
+    if (selectedFrom === null) {
+      if (optimisticBoard[ptIdx] === myPlayerId) {
+        setSelectedFrom(ptIdx);
+      } else {
+        setError("Click one of your pieces to select it.");
+      }
+    } else {
+      if (optimisticBoard[ptIdx] === myPlayerId) {
+        setSelectedFrom(ptIdx);
+        return;
+      }
+
+      if (optimisticBoard[ptIdx] !== null) {
+        setError("Destination point is occupied!");
+        return;
+      }
+
+      const from = selectedFrom;
+      const to = ptIdx;
+
+      setOptimisticBoard((prev) => ({ ...prev, [from]: null, [to]: myPlayerId }));
+      setSelectedFrom(null);
+
+      const res = await fetch(`/api/rooms/${code}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: getClientId(), action: "cicmic_move", from, to }),
+      });
+
+      if (!res.ok) {
+        setError((await res.json()).error);
+        setOptimisticBoard(game.board || {});
+      }
     }
   }
 
@@ -368,10 +432,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
   return (
     <div className="flex flex-col items-center gap-6">
-      
-      {/* SCORE & PIECE TRACKER */}
       <div className="grid w-full max-w-lg grid-cols-2 gap-4">
-        {/* Enemy Status */}
         <div className={`glass flex flex-col items-center rounded-2xl p-3 border-2 ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10" : "border-white/10"}`}>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full bg-neon-pink shadow-[0_0_8px_#ff5bc8]" />
@@ -389,7 +450,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           </div>
         </div>
 
-        {/* Your Status */}
         <div className={`glass flex flex-col items-center rounded-2xl p-3 border-2 ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10" : "border-white/10"}`}>
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 rounded-full bg-neon-blue shadow-[0_0_8px_#4dd8ff]" />
@@ -411,15 +471,34 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       <div className="text-center">
         <p className="text-sm font-semibold">
           {isYourTurn ? (
-            <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn to place!</span>
+            isPendingRemoval ? (
+              <span className="animate-pulse-glow rounded-full bg-neon-pink/20 px-4 py-1 text-neon-pink font-bold">
+                💥 3-IN-A-ROW! Click an opponent's piece to remove it!
+              </span>
+            ) : isPlacementPhase ? (
+              <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
+                Your turn to place! ({myUnplaced} left)
+              </span>
+            ) : isFlying ? (
+              <span className="animate-pulse-glow rounded-full bg-neon-purple/20 px-4 py-1 text-neon-purple-soft font-bold">
+                🦅 FLYING PHASE! Move any piece to any open spot!
+              </span>
+            ) : selectedFrom !== null ? (
+              <span className="animate-pulse-glow rounded-full bg-neon-blue/20 px-4 py-1 text-neon-blue-soft font-bold">
+                Piece selected — Click an adjacent open spot to move
+              </span>
+            ) : (
+              <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
+                Your turn — Click your piece to move it
+              </span>
+            )
           ) : (
             <span className="text-white/40">Waiting for {enemyNickname}...</span>
           )}
         </p>
-        {error && <p className="text-neon-pink text-sm mt-2">{error}</p>}
+        {error && <p className="text-neon-pink text-sm mt-2 font-bold">{error}</p>}
       </div>
 
-      {/* THE BOARD */}
       <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-xl border border-white/10 p-4 shadow-2xl">
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
@@ -434,11 +513,13 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
         {POINTS.map((pt, i) => {
           const owner = optimisticBoard[i];
           const isPlayer1 = owner === 1;
-          
+          const isSelected = selectedFrom === i;
+
           return (
             <button
               key={i}
               className={`absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 transition-all hover:scale-125
+                ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-20" : ""}
                 ${owner ? (isPlayer1 ? "bg-neon-blue border-white z-10 shadow-[0_0_10px_#4dd8ff]" : "bg-neon-pink border-white z-10 shadow-[0_0_10px_#ff5bc8]") : "bg-black/50 border-white/30 hover:border-white z-0"}
               `}
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
@@ -647,7 +728,6 @@ function GameBoard({
   const selectedAchievesGin = canAct && !!selectedCard && canGin(playableHand.filter((c) => c !== selectedCard));
   const ginDiscardCard = selectedAchievesGin ? selectedCard : autoGinDiscard;
   const canDeclareGin = canAct && !!ginDiscardCard;
-  const activeOpponents = displayGame.opponents.filter((o) => !o.eliminated);
   const turnPlayerName = displayGame.turnIdx === yourSeat ? "you" : room.seats[displayGame.turnIdx]?.nickname ?? "opponent";
 
   const prevRoundRef = useRef<number | null>(null);
