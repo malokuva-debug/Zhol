@@ -85,7 +85,7 @@ export default function HandFan({
             {/* Fan rotation lives here, isolated from Reorder's own drag transform.
                 Same vertical baseline for every card — only rotation + a fixed
                 lift-on-select, no per-position vertical staggering. */}
-            <div
+           <div
               style={{
                 transform: `rotate(${rotate}deg) translateY(${isSelected ? -20 : 0}px)`,
                 transformOrigin: "bottom center",
@@ -93,7 +93,12 @@ export default function HandFan({
               }}
             >
               <div className={`rounded-lg ${ringClass}`}>
-                <PlayingCard id={id} selected={isSelected} onClick={interactive ? () => onSelect(id) : undefined} />
+                <PlayingCard 
+                   id={id} 
+                   selected={isSelected} 
+                   onClick={interactive ? () => onSelect(id) : undefined} 
+                   layoutId={`card-${id}`} // ADDED THIS LINE
+                />
               </div>
             </div>
           </Reorder.Item>
