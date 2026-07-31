@@ -1,42 +1,3 @@
-// Add the game mode selection
-export type GameMode = "zhol" | "pishpirik";
-
-export interface HouseRules {
-  gameMode: GameMode; // <-- ADD THIS
-  ginBonuses: Record<GinType, number>;
-  eliminationScore: number;
-  turnTimerSeconds: number;
-  jokerCount: 0 | 2 | 4;
-}
-
-export const DEFAULT_HOUSE_RULES: HouseRules = {
-  gameMode: "zhol", // Default to Zhol
-  ginBonuses: DEFAULT_GIN_BONUSES,
-  eliminationScore: 101,
-  turnTimerSeconds: 30,
-  jokerCount: 2,
-};
-
-// Expand GameState to hold Pishpirik data
-export interface GameState {
-  deck: CardId[];
-  discard: CardId[];
-  turnIdx: number;
-  turnPhase: TurnPhase;
-  turnStartedAt: number;
-  roundNumber: number;
-  lastRoundEnd?: RoundEndInfo;
-  matchOver: boolean;
-  matchWinnerIdx?: number;
-  
-  // --- PISHPIRIK SPECIFIC STATE ---
-  dealerIdx?: number; // Tracks who dealt to rotate properly
-  tablePile?: CardId[]; // The pile of cards in the middle of the table
-  capturedBySeat?: Record<number, CardId[]>; // Tracks what each player has eaten
-  pishpiriksBySeat?: Record<number, number>; // Tracks number of Pishpiriks scored
-  lastCaptureIdx?: number; // Remembers who took last so they get the remaining table cards at the end
-}
-
 // Core domain types for Zhol (Kosovo-style Gin Rummy) — Gin-only variant with jokers.
 
 export type Suit = "S" | "H" | "D" | "C";
@@ -115,16 +76,35 @@ export interface RoundEndInfo {
   pointsBySeat: { seatIdx: number; deadwood: number; deadCards: CardId[]; eliminated: boolean }[]; // added to each loser's score
 }
 
+export type GameMode = "zhol" | "pishpirik" | "cicmic"; // Added cicmic
+
+export type CicmicPlayer = 1 | 2;
+export type CicmicPhase = "placement" | "movement" | "flying";
+
 export interface GameState {
   deck: CardId[];
   discard: CardId[];
-  turnIdx: number; // index into seats[] (skips eliminated seats)
+  turnIdx: number;
   turnPhase: TurnPhase;
   turnStartedAt: number;
   roundNumber: number;
   lastRoundEnd?: RoundEndInfo;
   matchOver: boolean;
   matchWinnerIdx?: number;
+  
+  // --- PISHPIRIK STATE ---
+  dealerIdx?: number;
+  tablePile?: CardId[];
+  capturedBySeat?: Record<number, CardId[]>;
+  pishpiriksBySeat?: Record<number, number>;
+  lastCaptureIdx?: number;
+
+  // --- CICMIC STATE ---
+  board?: Record<number, CicmicPlayer | null>; // Points 0-23 on the board
+  unplacedPieces?: Record<CicmicPlayer, number>; // Starts at 9 each
+  piecesOnBoard?: Record<CicmicPlayer, number>; // Tracks when a player drops to 3 (flying phase)
+  cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
+  pendingRemoval?: boolean; // True if the current player just formed a mill and gets to remove an opponent's piece
 }
 
 export interface ChatMessage {
