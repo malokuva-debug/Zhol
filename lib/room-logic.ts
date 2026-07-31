@@ -233,6 +233,7 @@ export function applyGin(room: Room, seatIdx: number, cardIdToDiscard: string): 
   if (!g) return { ok: false, error: "No active game." };
   if (g.turnIdx !== seatIdx) return { ok: false, error: "Not your turn." };
   if (g.turnPhase !== "discard") return { ok: false, error: "You must draw first." };
+
   const seat = room.seats[seatIdx]!;
   const idx = seat.hand.indexOf(cardIdToDiscard);
   if (idx === -1) return { ok: false, error: "Card not in hand." };
@@ -243,10 +244,13 @@ export function applyGin(room: Room, seatIdx: number, cardIdToDiscard: string): 
   const solution = minimizeDeadwood(handAfter);
   const jokersInHand = handAfter.filter(isJokerId);
   const winnerMelds = resolveJokerPlaceholders(solution.melds, jokersInHand);
-  const ginType = classifyGin(handAfter, winnerMelds);
+  
+  // -> Pass cardIdToDiscard to determine if it was a Joker discard
+  const ginType = classifyGin(handAfter, winnerMelds, cardIdToDiscard);
 
   seat.hand.splice(idx, 1);
   g.discard.push(cardIdToDiscard);
+
   resolveRound(room, seatIdx, ginType, winnerMelds);
   return { ok: true };
 }
