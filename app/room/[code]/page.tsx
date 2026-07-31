@@ -55,6 +55,7 @@ export default function RoomPage() {
     if (data.room.status !== "waiting") return;
     if (data.room.seats.every(Boolean)) return;
     if (joining) return;
+
     setJoining(true);
     fetch(`/api/rooms/${code}/join`, {
       method: "POST",
@@ -75,15 +76,35 @@ export default function RoomPage() {
   }
 
   if (!data) {
-    return <main className="flex min-h-screen items-center justify-center text-white/40">Loading table…</main>;
+    return <main className="flex min-h-screen items-center justify-center text-white/40">Loading table </main>;
   }
 
   const { room, yourSeat, game } = data;
 
-  function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clientId: string }) {
+  return (
+    <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
+      <RoomHeader room={room} clientId={clientId} />
+      {room.status === "waiting" && <WaitingRoom room={room} yourSeat={yourSeat} clientId={clientId} code={code} />}
+      {room.status !== "waiting" && game && yourSeat !== null && (
+        <GameBoard
+          room={room}
+          game={game}
+          yourSeat={yourSeat}
+          code={code}
+          selectedCard={selectedCard}
+          setSelectedCard={setSelectedCard}
+          actionError={actionError}
+          setActionError={setActionError}
+        />
+      )}
+    </main>
+  );
+}
+
+function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clientId: string }) {
   const router = useRouter();
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  
+
   const isHost = room.hostClientId === clientId;
 
   function copy(kind: "code" | "link") {
@@ -96,13 +117,13 @@ export default function RoomPage() {
 
   async function handleDeleteRoom() {
     if (!confirm("Are you sure you want to completely delete this room? This will kick everyone out.")) return;
-    
+
     await fetch(`/api/rooms/${room.code}/delete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
     });
-    
+
     router.push("/lobby");
   }
 
@@ -131,34 +152,6 @@ export default function RoomPage() {
     </header>
   );
 }
-function RoomHeader({ room }: { room: Omit<Room, "passwordHash"> }) {
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
-
-  function copy(kind: "code" | "link") {
-    const text = kind === "code" ? room.code : `${window.location.origin}/room/${room.code}`;
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(kind);
-      setTimeout(() => setCopied(null), 1500);
-    });
-  }
-
-  return (
-    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">{room.name}</div>
-        <h1 className="text-2xl font-black text-glow-purple">Room {room.code}</h1>
-      </div>
-      <div className="flex gap-2">
-        <button onClick={() => copy("code")} className="glass rounded-lg px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10">
-          {copied === "code" ? "Copied!" : "Copy Code"}
-        </button>
-        <button onClick={() => copy("link")} className="glass rounded-lg px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10">
-          {copied === "link" ? "Copied!" : "Copy Invite Link"}
-        </button>
-      </div>
-    </header>
-  );
-}
 
 function WaitingRoom({
   room,
@@ -173,9 +166,11 @@ function WaitingRoom({
 }) {
   const router = useRouter();
   const isHost = room.hostClientId === clientId;
+
   const occupied = room.seats.filter(Boolean);
   const bothReady = occupied.every((s) => s?.ready);
   const enoughPlayers = occupied.length >= 2;
+
   const you = yourSeat !== null ? room.seats[yourSeat] : null;
 
   async function toggleReady() {
@@ -185,6 +180,7 @@ function WaitingRoom({
       body: JSON.stringify({ clientId, ready: !you?.ready }),
     });
   }
+
   async function startGame() {
     await fetch(`/api/rooms/${code}/start`, {
       method: "POST",
@@ -192,6 +188,7 @@ function WaitingRoom({
       body: JSON.stringify({ clientId }),
     });
   }
+
   async function leave() {
     await fetch(`/api/rooms/${code}/leave`, {
       method: "POST",
@@ -228,7 +225,7 @@ function WaitingRoom({
         <span className="glass rounded-full px-3 py-1">
           Timer: {room.rules.turnTimerSeconds ? `${room.rules.turnTimerSeconds}s` : "Off"}
         </span>
-        <span className="glass rounded-full px-3 py-1">Gin only — no knock</span>
+        <span className="glass rounded-full px-3 py-1">Gin only   no knock</span>
         <span className="glass rounded-full px-3 py-1">
           {room.maxPlayers >= 3 ? "2 decks + 2 jokers" : "1 deck + 2 jokers"}
         </span>
@@ -254,6 +251,7 @@ function WaitingRoom({
             Start Game
           </button>
         )}
+
         <button onClick={leave} className="ml-auto rounded-xl border border-white/10 px-6 py-2.5 font-semibold text-white/60 hover:bg-white/5">
           Leave Room
         </button>
@@ -284,47 +282,21 @@ function GameBoard({
   const router = useRouter();
   const clientId = getClientId();
   const you = room.seats[yourSeat];
+
   const discardRef = useRef<HTMLDivElement>(null);
   const ginRef = useRef<HTMLButtonElement>(null);
+
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
   const canAct = isYourTurn && game.turnPhase === "discard";
 
   const deadwoodInfo = useMemo(() => minimizeDeadwood(game.yourHand), [game.yourHand]);
   const jokersInHand = useMemo(() => game.yourHand.filter(isJokerId), [game.yourHand]);
+
   const resolvedMelds = useMemo(
     () => resolveJokerPlaceholders(deadwoodInfo.melds, jokersInHand),
     [deadwoodInfo, jokersInHand]
   );
 
-  const handleDragEnd = (cardId: string, info: PanInfo) => {
-    if (!canAct) return;
-    const { x, y } = info.point;
-
-    const checkZone = (ref: React.RefObject<HTMLElement>) => {
-      if (!ref.current) return false;
-      const rect = ref.current.getBoundingClientRect();
-      // Generous 20px padding around the drop zones
-      return x >= rect.left - 20 && x <= rect.right + 20 && y >= rect.top - 20 && y <= rect.bottom + 20;
-    };
-
-    const achievesGin = canGin(game.yourHand.filter((c) => c !== cardId));
-
-    if (checkZone(ginRef)) {
-      if (achievesGin) {
-        sendMove({ action: "gin", cardId });
-      } else {
-        setActionError("That card does not result in a valid Gin.");
-      }
-    } else if (checkZone(discardRef) || info.offset.y < -150) {
-      // If dropped on the center pile OR flicked upwards significantly (>150px)
-      if (achievesGin) {
-        sendMove({ action: "gin", cardId }); // Auto-gin if the flicked discard solves the hand!
-      } else {
-        sendMove({ action: "discard", cardId });
-      }
-    }
-  };
-  
   const meldIndexByCard = useMemo(() => {
     const map: Record<string, number> = {};
     resolvedMelds.forEach((m, idx) => m.cards.forEach((c) => (map[c] = idx)));
@@ -352,11 +324,33 @@ function GameBoard({
     router.push("/lobby");
   }
 
-  // Gin is evaluated AFTER a discard, by simulating every possible discard —
-  // not by requiring the hand to already be fully melded before discarding.
-  // If the player has manually selected a card that itself achieves Gin, use
-  // that; otherwise fall back to whichever discard (if any) achieves it, so
-  // the Gin button lights up as soon as it's possible at all.
+  const handleDragEnd = (cardId: string, info: PanInfo) => {
+    if (!canAct) return;
+    const { x, y } = info.point;
+
+    const checkZone = (ref: React.RefObject<any>) => {
+      if (!ref.current) return false;
+      const rect = ref.current.getBoundingClientRect();
+      return x >= rect.left - 20 && x <= rect.right + 20 && y >= rect.top - 20 && y <= rect.bottom + 20;
+    };
+
+    const achievesGin = canGin(game.yourHand.filter((c) => c !== cardId));
+
+    if (checkZone(ginRef)) {
+      if (achievesGin) {
+        sendMove({ action: "gin", cardId });
+      } else {
+        setActionError("That card does not result in a valid Gin.");
+      }
+    } else if (checkZone(discardRef) || info.offset.y < -150) {
+      if (achievesGin) {
+        sendMove({ action: "gin", cardId });
+      } else {
+        sendMove({ action: "discard", cardId });
+      }
+    }
+  };
+
   const autoGinDiscard = useMemo(
     () => (canAct && game.yourHand.length === 11 ? findGinDiscard(game.yourHand) : null),
     [canAct, game.yourHand]
@@ -366,15 +360,11 @@ function GameBoard({
   const canDeclareGin = canAct && !!ginDiscardCard;
 
   const activeOpponents = game.opponents.filter((o) => !o.eliminated);
-  const turnPlayerName =
-    game.turnIdx === yourSeat ? "you" : room.seats[game.turnIdx]?.nickname ?? "opponent";
+  const turnPlayerName = game.turnIdx === yourSeat ? "you" : room.seats[game.turnIdx]?.nickname ?? "opponent";
 
-  // Deal animation: replays once per round (including the very first render
-  // this client sees a round on), purely as a visual flourish   the real
-  // hands are already in `game` by the time this fires.
   const prevRoundRef = useRef<number | null>(null);
   const [dealState, setDealState] = useState<{ round: number; targets: DealTarget[] } | null>(null);
-  const [showingScore, setShowingScore] = useState(false); // Added state
+  const [showingScore, setShowingScore] = useState(false);
 
   useEffect(() => {
     if (prevRoundRef.current === null || game.roundNumber !== prevRoundRef.current) {
@@ -399,7 +389,6 @@ function GameBoard({
           })),
       ];
 
-      // If it's a new round (not initial load), show score for 5s before dealing
       if (!isFirstLoad && game.lastRoundEnd) {
         setShowingScore(true);
         const timer = setTimeout(() => {
@@ -427,9 +416,6 @@ function GameBoard({
         )}
       </AnimatePresence>
 
-      {/* Opponents — seated around the table. In 1v1 the opponent sits directly
-          across (in front of you); with 3+ players everyone is spread evenly
-          around the arc, mirroring how people actually sit at a round table. */}
       <div className="relative h-48 sm:h-56">
         {game.opponents.map((opp, i) => {
           const pos = seatPosition(i, game.opponents.length);
@@ -458,18 +444,16 @@ function GameBoard({
         })}
       </div>
 
-      {/* Table */}
       <div className="felt-table relative rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div className="text-xs text-white/50">
-            Round {game.roundNumber} · Elimination at {room.rules.eliminationScore} · {activeOpponents.length + 1} still in
+            Round {game.roundNumber}   Elimination at {room.rules.eliminationScore}   {activeOpponents.length + 1} still in
           </div>
           <TurnTimer startedAt={game.turnStartedAt} seconds={game.turnTimerSeconds} active={!game.matchOver} />
         </div>
 
         <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
           <div className="relative h-32 w-24 sm:h-36 sm:w-28">
-            {/* Stock — vertical, straight */}
             <button
               disabled={!isYourTurn || game.turnPhase !== "draw"}
               onClick={() => sendMove({ action: "draw", source: "stock" })}
@@ -481,7 +465,6 @@ function GameBoard({
               </span>
             </button>
 
-            {/* Discard top card — vertical, tilted, overlapping to the right of the stock */}
             <button
               disabled={!isYourTurn || game.turnPhase !== "draw" || !game.discardTop}
               onClick={() => sendMove({ action: "draw", source: "discard" })}
@@ -496,7 +479,6 @@ function GameBoard({
             </button>
           </div>
 
-          {/* Decorative history of prior discards, off to the right — not drawable, just flavor */}
           {game.discard.length > 1 && (
             <div className="hidden items-end sm:flex" style={{ height: "7rem" }}>
               {game.discard.slice(0, -1).slice(-4).map((id, i, arr) => (
@@ -511,54 +493,57 @@ function GameBoard({
           )}
         </div>
 
-        <div className={`text-center text-xs uppercase tracking-wider text-white/30 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>Draw Deck   Face-up Draw Card   Discard Pile  </div>
+        <div className={`text-center text-xs uppercase tracking-wider text-white/30 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
+          Draw Deck   Face-up Draw Card   Discard Pile 
+        </div>
 
-        <div className={`text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
+        <div className={`mt-2 text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
           {game.matchOver ? (
             <span className="text-neon-purple-soft">Match complete</span>
           ) : isYourTurn ? (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">
-              Your turn — {game.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}
+              Your turn   {game.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}
             </span>
           ) : (
-            <span className="text-white/40">Waiting for {turnPlayerName}…</span>
+            <span className="text-white/40">Waiting for {turnPlayerName} </span>
           )}
         </div>
 
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
 
         <AnimatePresence>
-  {showingScore && game.lastRoundEnd && <RoundEndReveal info={game.lastRoundEnd} room={room} roundKey={game.roundNumber} />}
-</AnimatePresence>
-<AnimatePresence>
-  {game.matchOver && !showingScore && <WinOverlay game={game} room={room} onExit={leave} />}
-</AnimatePresence>
+          {showingScore && game.lastRoundEnd && <RoundEndReveal info={game.lastRoundEnd} room={room} roundKey={game.roundNumber} />}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {game.matchOver && !showingScore && <WinOverlay game={game} room={room} onExit={leave} />}
+        </AnimatePresence>
       </div>
 
-      {/* Your hand */}
       <div className="glass rounded-2xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-semibold text-white/70">
-            Your hand · Deadwood:{" "}
+            Your hand   Deadwood:{" "}
             <span className={deadwoodInfo.deadwood === 0 ? "text-neon-blue-soft" : "text-white"}>{deadwoodInfo.deadwood}</span>
           </span>
           <div className="flex flex-wrap gap-2">
-            <ActionButton ref={ginRef} disabled={!canDeclareGin} onClick={() => sendMove({ action: "gin", cardId: ginDiscardCard })} variant="purple">
-  Zhol! (Gin)
-</ActionButton>
-            <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard })} variant="ghost">
+            <ActionButton ref={ginRef} disabled={!canDeclareGin} onClick={() => sendMove({ action: "gin", cardId: ginDiscardCard || "" })} variant="purple">
+              Zhol! (Gin)
+            </ActionButton>
+            <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard || "" })} variant="ghost">
               Discard
             </ActionButton>
           </div>
         </div>
+
         <HandFan
-  cards={showingScore ? [] : game.yourHand}
-  selectedCard={selectedCard}
-  onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
-  interactive={canAct && !showingScore}
-  meldIndexByCard={meldIndexByCard}
-  onDragEnd={handleDragEnd} // ADD THIS LINE
-/>
+          cards={showingScore ? [] : game.yourHand}
+          selectedCard={selectedCard}
+          onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
+          interactive={canAct && !showingScore}
+          meldIndexByCard={meldIndexByCard}
+          onDragEnd={handleDragEnd}
+        />
       </div>
 
       <PlayerStrip
@@ -573,16 +558,10 @@ function GameBoard({
   );
 }
 
-/**
- * Positions opponents around a round table. "You" occupy the fixed bottom
- * seat (rendered separately below, not part of this arc) — everyone else is
- * spread evenly around the remaining arc. With exactly one opponent (1v1),
- * this places them directly across from you, i.e. sitting in front of you.
- */
 function seatPosition(index: number, opponentCount: number): { x: number; y: number } {
-  const totalSeats = opponentCount + 1; // + your fixed seat
+  const totalSeats = opponentCount + 1;
   const angleStep = 360 / totalSeats;
-  const angleDeg = 90 + angleStep * (index + 1); // your seat is anchored at 90° (bottom)
+  const angleDeg = 90 + angleStep * (index + 1);
   const rad = (angleDeg * Math.PI) / 180;
   return { x: 50 + 42 * Math.cos(rad), y: 50 + 40 * Math.sin(rad) };
 }
@@ -643,8 +622,8 @@ function PlayerStrip({
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
         {eliminated && <span className="text-xs text-neon-pink">eliminated</span>}
-        {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting…</span>}
-        {faceDown && !eliminated && <span className="text-xs text-white/40">· {cardCount} cards</span>}
+        {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting </span>}
+        {faceDown && !eliminated && <span className="text-xs text-white/40">  {cardCount} cards</span>}
       </div>
       <ScoreBadge score={score} className="text-lg text-neon-blue-soft" />
     </div>
@@ -661,7 +640,7 @@ function WinOverlay({ game, room, onExit }: { game: ClientGameState; room: Omit<
     >
       <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", bounce: 0.5 }} className="text-center">
         <div className="mb-1 text-xs uppercase tracking-[0.3em] text-neon-blue-soft">Match Over</div>
-        <div className="text-4xl font-black text-glow-purple">{winner} Wins! 🎉</div>
+        <div className="text-4xl font-black text-glow-purple">{winner} Wins!  </div>
         <div className="mt-2 space-y-0.5 text-sm text-white/60">
           {room.seats.filter(Boolean).map((s, i) => (
             <div key={i}>
