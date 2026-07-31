@@ -6,6 +6,7 @@ import { publishLobbyUpdate } from "@/lib/pusher";
 
 const CreateRoomSchema = z.object({
   name: z.string().min(1).max(40),
+  gameMode: z.enum(["zhol", "pishpirik", "cicmic"]), // <-- Added this
   visibility: z.enum(["public", "private"]),
   password: z.string().max(40).optional(),
   maxPlayers: z.number().min(2).max(6),
@@ -18,11 +19,13 @@ const CreateRoomSchema = z.object({
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = CreateRoomSchema.safeParse(body);
+
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid room settings." }, { status: 400 });
   }
-  const d = parsed.data;
 
+  const d = parsed.data;
+  
   const room = newRoom({
     name: d.name,
     visibility: d.visibility,
@@ -31,6 +34,7 @@ export async function POST(req: Request) {
     hostNickname: d.hostNickname,
     hostClientId: d.hostClientId,
     rules: {
+      gameMode: d.gameMode, // <-- Save the selected game mode
       turnTimerSeconds: d.turnTimerSeconds,
       eliminationScore: d.eliminationScore ?? 101,
     },
