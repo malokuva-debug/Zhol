@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { getClientId } from "@/lib/client-id";
@@ -9,7 +9,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   const router = useRouter();
   const [name, setName] = useState(`${nickname}'s table`);
   const [gameMode, setGameMode] = useState<"zhol" | "pishpirik" | "cicmic">("zhol");
-  const [teamMode, setTeamMode] = useState<"1v1" | "2v2">("1v1");
+  const [teamMode, setTeamMode] = useState<"1v1" | "2v2" | "free">("free");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [password, setPassword] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(2);
@@ -17,6 +17,20 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   const [eliminationScore, setEliminationScore] = useState(101);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // Enforce mode rules dynamically
+  useEffect(() => {
+    if (gameMode === "zhol") {
+      setTeamMode("free");
+    } else if (gameMode === "cicmic") {
+      setTeamMode("1v1");
+      setMaxPlayers(2);
+    } else if (gameMode === "pishpirik") {
+      if (teamMode === "1v1") setMaxPlayers(2);
+      else if (teamMode === "2v2") setMaxPlayers(4);
+      else if (maxPlayers > 4) setMaxPlayers(4); // Pishpirik free is max 4
+    }
+  }, [gameMode, teamMode, maxPlayers]);
 
   async function handleCreate() {
     setBusy(true);
@@ -29,10 +43,10 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
         body: JSON.stringify({
           name,
           gameMode,
-          teamMode, // Sent safely here
+          teamMode,
           visibility,
           password: visibility === "private" && password ? password : undefined,
-          maxPlayers: teamMode === "2v2" ? 4 : maxPlayers, // Force 4 players if 2v2 is selected
+          maxPlayers,
           turnTimerSeconds: turnTimer,
           eliminationScore,
           hostNickname: nickname,
@@ -62,7 +76,6 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
 
         <div className="space-y-4">
           
-          {/* GAME MODE SELECTION */}
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Game Mode</label>
             <div className="flex gap-2">
@@ -80,8 +93,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
             </div>
           </div>
 
-          {/* TEAM MODE SELECTION */}
-          {gameMode !== "cicmic" && (
+          {gameMode === "pishpirik" && (
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Format</label>
               <div className="flex gap-2">
@@ -89,7 +101,8 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
                   <button
                     key={mode}
                     onClick={() => {
-                      setTeamMode(mode as "1v1" | "2v2");
+                      setTeamMode(mode);
+                      if (mode === "1v1") setMaxPlayers(2);
                       if (mode === "2v2") setMaxPlayers(4);
                     }}
                     className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold uppercase transition ${
@@ -139,21 +152,24 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
 
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">
-              Players ({teamMode === "2v2" ? 4 : maxPlayers})
+              Players ({maxPlayers})
             </label>
             <div className="flex gap-2">
-              {[2, 3, 4, 5, 6].map((n) => (
-                <button
-                  key={n}
-                  disabled={teamMode === "2v2"}
-                  onClick={() => setMaxPlayers(n)}
-                  className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold transition ${
-                    (teamMode === "2v2" ? 4 : maxPlayers) === n ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
-                  } ${teamMode === "2v2" && n !== 4 ? "opacity-30 cursor-not-allowed" : ""}`}
-                >
-                  {n}
-                </button>
-              ))}
+              {[2, 3, 4, 5, 6].map((n) => {
+                const disabled = gameMode === "cicmic" || teamMode !== "free" || (gameMode === "pishpirik" && n > 4);
+                return (
+                  <button
+                    key={n}
+                    disabled={disabled}
+                    onClick={() => setMaxPlayers(n)}
+                    className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold transition ${
+                      maxPlayers === n ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
+                    } ${disabled && maxPlayers !== n ? "opacity-20 cursor-not-allowed" : ""}`}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -174,22 +190,6 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
               />
             </div>
           )}
-
-          <div>
-            <label className="mb-1 flex justify-between text-xs font-medium uppercase tracking-wider text-white/50">
-              <span>Turn timer</span>
-              <span>{turnTimer === 0 ? "Off" : `${turnTimer}s`}</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={90}
-              step={15}
-              value={turnTimer}
-              onChange={(e) => setTurnTimer(Number(e.target.value))}
-              className="w-full accent-[#4dd8ff]"
-            />
-          </div>
 
         </div>
 
