@@ -31,7 +31,8 @@ export default function RoomPage() {
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [joining, setJoining] = useState(false);
-
+  const [hasJoined, setHasJoined] = useState(false); // Add this line
+  
   useEffect(() => {
     const n = getNickname();
     if (!n) {
@@ -51,7 +52,21 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (!data || !nickname || !clientId) return;
-    if (data.yourSeat !== null) return;
+    
+    // If we have a seat, mark that we successfully joined
+    if (data.yourSeat !== null) {
+      if (!hasJoined) setHasJoined(true);
+      return;
+    }
+
+    // If we PREVIOUSLY had a seat but now don't, we were kicked!
+    if (hasJoined && data.yourSeat === null) {
+      alert("You have been kicked from the room.");
+      removeRecentRoom(code); // Wipe from local memory
+      router.push("/lobby");
+      return;
+    }
+
     if (data.room.status !== "waiting") return;
     if (data.room.seats.every(Boolean)) return;
     if (joining) return;
@@ -62,7 +77,7 @@ export default function RoomPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nickname, clientId }),
     }).finally(() => setJoining(false));
-  }, [data, nickname, clientId, code, joining]);
+  }, [data, nickname, clientId, code, joining, hasJoined, router]);
 
   useEffect(() => {
     if (data && data.room) {
@@ -168,6 +183,26 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 
   const you = yourSeat !== null ? room.seats[yourSeat] : null;
 
+  async function leave() {
+    removeRecentRoom(code);
+    await fetch(`/api/rooms/${code}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    });
+    router.push("/lobby");
+  }
+
+  // ADD THIS FUNCTION
+  async function kickPlayer(targetClientId: string) {
+    if (!confirm("Are you sure you want to kick this player?")) return;
+    await fetch(`/api/rooms/${code}/kick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, targetClientId }),
+    });
+  }
+
   async function toggleReady() {
     await fetch(`/api/rooms/${code}/ready`, {
       method: "POST",
@@ -208,6 +243,16 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
                 <div className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold ${seat.ready ? "bg-neon-blue/20 text-neon-blue-soft" : "bg-white/10 text-white/40"}`}>
                   {seat.ready ? "Ready" : "Not ready"}
                 </div>
+                
+                {/* ADD THE KICK BUTTON HERE */}
+                {isHost && seat.clientId !== clientId && (
+                  <button
+                    onClick={() => kickPlayer(seat.clientId)}
+                    className="mt-3 block w-full rounded-lg bg-neon-pink/20 py-1.5 text-xs font-bold text-neon-pink transition hover:bg-neon-pink/30"
+                  >
+                    Kick
+                  </button>
+                )}
               </>
             ) : (
               <div className="py-2 text-white/30">Open seat</div>
