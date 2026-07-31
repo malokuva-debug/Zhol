@@ -536,7 +536,6 @@ function GameBoard({
                 className="relative z-10 disabled:cursor-not-allowed"
               >
                 {displayGame.discardTop ? (
-                  {/* Passing layoutId seamlessly connects the hand to the discard pile! */}
                   <PlayingCard id={displayGame.discardTop} layoutId={`card-${displayGame.discardTop}`} />
                 ) : (
                   <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem]" />
