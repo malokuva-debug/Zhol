@@ -8,6 +8,31 @@ function randomId(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+const RECENT_ROOMS_KEY = "zhol.recentRooms";
+
+export function getRecentRooms(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_ROOMS_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function addRecentRoom(code: string): void {
+  if (typeof window === "undefined") return;
+  const rooms = getRecentRooms();
+  // Keep the 3 most recent rooms, putting the newest at the front
+  const updated = [code, ...rooms.filter((r) => r !== code)].slice(0, 3);
+  localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(updated));
+}
+
+export function removeRecentRoom(code: string): void {
+  if (typeof window === "undefined") return;
+  const rooms = getRecentRooms();
+  localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(rooms.filter((r) => r !== code)));
+}
+
 /** Stable per-device identifier. Not an account — just lets the server
  * recognize "this browser" for reconnect / seat ownership purposes. */
 export function getClientId(): string {
