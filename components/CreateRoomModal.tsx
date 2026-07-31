@@ -9,7 +9,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   const router = useRouter();
   const [name, setName] = useState(`${nickname}'s table`);
   const [gameMode, setGameMode] = useState<"zhol" | "pishpirik" | "cicmic">("zhol");
-  const [teamMode, setTeamMode] = useState<"1v1" | "2v2">("1v1"); // NEW
+  const [teamMode, setTeamMode] = useState<"1v1" | "2v2">("1v1");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [password, setPassword] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(2);
@@ -21,11 +21,6 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   async function handleCreate() {
     setBusy(true);
     setError("");
-    body: JSON.stringify({
-          name,
-          gameMode,
-          teamMode, // PASS IT HERE
-          visibility,
 
     try {
       const res = await fetch("/api/rooms", {
@@ -34,9 +29,10 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
         body: JSON.stringify({
           name,
           gameMode,
+          teamMode, // Sent safely here
           visibility,
           password: visibility === "private" && password ? password : undefined,
-          maxPlayers,
+          maxPlayers: teamMode === "2v2" ? 4 : maxPlayers, // Force 4 players if 2v2 is selected
           turnTimerSeconds: turnTimer,
           eliminationScore,
           hostNickname: nickname,
@@ -84,17 +80,17 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
             </div>
           </div>
 
-          {/* TEAM MODE SELECTION (Only show if not Cicmic) */}
+          {/* TEAM MODE SELECTION */}
           {gameMode !== "cicmic" && (
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Format</label>
               <div className="flex gap-2">
-                {(["1v1", "2v2"] as const).map((mode) => (
+                {(["1v1", "2v2", "free"] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => {
-                      setTeamMode(mode);
-                      if (mode === "2v2") setMaxPlayers(4); // Force 4 players for 2v2
+                      setTeamMode(mode as "1v1" | "2v2");
+                      if (mode === "2v2") setMaxPlayers(4);
                     }}
                     className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold uppercase transition ${
                       teamMode === mode ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
@@ -143,16 +139,17 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
 
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">
-              Players ({maxPlayers}) {maxPlayers >= 3 && gameMode === "zhol" && <span className="text-neon-purple-soft">— 2 decks + 2 jokers</span>}
+              Players ({teamMode === "2v2" ? 4 : maxPlayers})
             </label>
             <div className="flex gap-2">
               {[2, 3, 4, 5, 6].map((n) => (
                 <button
                   key={n}
+                  disabled={teamMode === "2v2"}
                   onClick={() => setMaxPlayers(n)}
                   className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold transition ${
-                    maxPlayers === n ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
-                  }`}
+                    (teamMode === "2v2" ? 4 : maxPlayers) === n ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
+                  } ${teamMode === "2v2" && n !== 4 ? "opacity-30 cursor-not-allowed" : ""}`}
                 >
                   {n}
                 </button>
@@ -175,7 +172,6 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
                 onChange={(e) => setEliminationScore(Number(e.target.value))}
                 className="w-full accent-[#a35bff]"
               />
-              <p className="mt-1 text-[11px] text-white/40">The score limit required to end the match.</p>
             </div>
           )}
 
