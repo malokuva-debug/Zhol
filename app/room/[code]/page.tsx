@@ -359,6 +359,105 @@ function GameBoard({
     return map;
   }, [resolvedMelds]);
 
+  function PishpirikBoard({
+  room,
+  game,
+  yourSeat,
+  code,
+  selectedCard,
+  setSelectedCard,
+  actionError,
+  setActionError,
+}: {
+  room: Omit<Room, "passwordHash">;
+  game: ClientGameState;
+  yourSeat: number;
+  code: string;
+  selectedCard: string | null;
+  setSelectedCard: (c: string | null) => void;
+  actionError: string;
+  setActionError: (e: string) => void;
+}) {
+  const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
+  const canAct = isYourTurn && game.turnPhase === "discard"; // "discard" = play card in Pishpirik
+
+  async function playCard(cardId: string) {
+    setActionError("");
+    const res = await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId: getClientId(), action: "pishpirik_play", cardId }),
+    });
+    if (!res.ok) setActionError((await res.json()).error);
+    setSelectedCard(null);
+  }
+
+  const tablePile = game.tablePile || [];
+
+  return (
+    <div className="relative space-y-4">
+      {/* Opponents mapping goes here (similar to Zhol) */}
+
+      <div className="felt-table relative rounded-3xl p-6">
+        <div className="flex items-center justify-between text-xs text-white/50">
+          <span>Pishpirik • {room.rules.teamMode}</span>
+          <TurnTimer startedAt={game.turnStartedAt} seconds={room.rules.turnTimerSeconds} active={!game.matchOver} />
+        </div>
+
+        {/* The 4+ Cards in the middle of the table */}
+        <div className="flex items-center justify-center gap-2 py-16">
+          {tablePile.length === 0 ? (
+            <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem] flex items-center justify-center text-white/30 text-xs">Empty</div>
+          ) : (
+            <div className="relative flex">
+              {tablePile.map((id, i) => (
+                <motion.div
+                  key={id + i}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  style={{ marginLeft: i === 0 ? 0 : -35, zIndex: i }}
+                >
+                  <PlayingCard id={id} />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="text-center text-sm font-semibold mt-4">
+          {isYourTurn ? (
+            <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn — Play a card</span>
+          ) : (
+            <span className="text-white/40">Waiting for opponent...</span>
+          )}
+        </div>
+
+        {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
+      </div>
+
+      {/* Your Hand */}
+      <div className="glass rounded-2xl p-4">
+        <div className="mb-3 flex justify-between items-center">
+          <span className="text-sm font-semibold text-white/70">Your Hand</span>
+          <button
+            disabled={!canAct || !selectedCard}
+            onClick={() => selectedCard && playCard(selectedCard)}
+            className="rounded-lg bg-neon-purple/20 px-4 py-1.5 text-xs font-bold text-neon-purple-soft disabled:opacity-30"
+          >
+            Play Selected Card
+          </button>
+        </div>
+        <HandFan
+          cards={game.yourHand}
+          selectedCard={selectedCard}
+          onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
+          interactive={canAct}
+        />
+      </div>
+    </div>
+  );
+}
+
   async function sendMove(body: Record<string, unknown>) {
     setActionError("");
 
