@@ -218,17 +218,7 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
       body: JSON.stringify({ clientId }),
     });
   }
-
-  async function leave() {
-    removeRecentRoom(code);
-    await fetch(`/api/rooms/${code}/leave`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId }),
-    });
-    router.push("/lobby");
-  }
-
+  
   return (
     <div className="glass glow-purple rounded-2xl p-6">
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
