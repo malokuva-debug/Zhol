@@ -309,13 +309,15 @@ function GameBoard({
     game.turnIdx === yourSeat ? "you" : room.seats[game.turnIdx]?.nickname ?? "opponent";
 
   // Deal animation: replays once per round (including the very first render
-  // this client sees a round on), purely as a visual flourish — the real
+  // this client sees a round on), purely as a visual flourish   the real
   // hands are already in `game` by the time this fires.
   const prevRoundRef = useRef<number | null>(null);
   const [dealState, setDealState] = useState<{ round: number; targets: DealTarget[] } | null>(null);
+  const [showingScore, setShowingScore] = useState(false); // Added state
 
   useEffect(() => {
     if (prevRoundRef.current === null || game.roundNumber !== prevRoundRef.current) {
+      const isFirstLoad = prevRoundRef.current === null;
       prevRoundRef.current = game.roundNumber;
 
       const activeSeatIndices = room.seats
@@ -335,7 +337,23 @@ function GameBoard({
             finalCount: o.seatIdx === starterSeat ? 11 : 10,
           })),
       ];
-      setDealState({ round: game.roundNumber, targets });
+
+      // If it's a new round (not initial load), show score for 5s before dealing
+      if (!isFirstLoad && game.lastRoundEnd) {
+        setShowingScore(true);
+        const timer = setTimeout(() => {
+          setShowingScore(false);
+          if (!game.matchOver) {
+            setDealState({ round: game.roundNumber, targets });
+          }
+        }, 5000);
+        return () => clearTimeout(timer);
+      } else {
+        setShowingScore(false);
+        if (!game.matchOver) {
+          setDealState({ round: game.roundNumber, targets });
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.roundNumber]);
@@ -371,7 +389,7 @@ function GameBoard({
               />
               {!opp.eliminated && (
                 <div className="flex justify-center">
-                  <OpponentFan count={opp.cardCount} />
+                  <OpponentFan count={showingScore ? 0 : opp.cardCount} />
                 </div>
               )}
             </div>
@@ -388,7 +406,7 @@ function GameBoard({
           <TurnTimer startedAt={game.turnStartedAt} seconds={game.turnTimerSeconds} active={!game.matchOver} />
         </div>
 
-        <div className="flex items-center justify-center gap-10 py-10">
+        <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
           <div className="relative h-32 w-24 sm:h-36 sm:w-28">
             {/* Stock — vertical, straight */}
             <button
@@ -432,9 +450,9 @@ function GameBoard({
           )}
         </div>
 
-        <div className="text-center text-xs uppercase tracking-wider text-white/30">Draw Deck · Face-up Draw Card · Discard Pile →</div>
+        <div className={`text-center text-xs uppercase tracking-wider text-white/30 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>Draw Deck   Face-up Draw Card   Discard Pile  </div>
 
-        <div className="text-center text-sm font-semibold">
+        <div className={`text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
           {game.matchOver ? (
             <span className="text-neon-purple-soft">Match complete</span>
           ) : isYourTurn ? (
@@ -449,9 +467,11 @@ function GameBoard({
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
 
         <AnimatePresence>
-          {game.lastRoundEnd && <RoundEndReveal info={game.lastRoundEnd} room={room} roundKey={game.roundNumber} />}
-        </AnimatePresence>
-        <AnimatePresence>{game.matchOver && <WinOverlay game={game} room={room} onExit={leave} />}</AnimatePresence>
+  {showingScore && game.lastRoundEnd && <RoundEndReveal info={game.lastRoundEnd} room={room} roundKey={game.roundNumber} />}
+</AnimatePresence>
+<AnimatePresence>
+  {game.matchOver && !showingScore && <WinOverlay game={game} room={room} onExit={leave} />}
+</AnimatePresence>
       </div>
 
       {/* Your hand */}
@@ -471,12 +491,12 @@ function GameBoard({
           </div>
         </div>
         <HandFan
-          cards={game.yourHand}
-          selectedCard={selectedCard}
-          onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
-          interactive={canAct}
-          meldIndexByCard={meldIndexByCard}
-        />
+  cards={showingScore ? [] : game.yourHand}
+  selectedCard={selectedCard}
+  onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
+  interactive={canAct && !showingScore}
+  meldIndexByCard={meldIndexByCard}
+/>
       </div>
 
       <PlayerStrip
