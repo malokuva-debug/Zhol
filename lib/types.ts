@@ -1,3 +1,42 @@
+// Add the game mode selection
+export type GameMode = "zhol" | "pishpirik";
+
+export interface HouseRules {
+  gameMode: GameMode; // <-- ADD THIS
+  ginBonuses: Record<GinType, number>;
+  eliminationScore: number;
+  turnTimerSeconds: number;
+  jokerCount: 0 | 2 | 4;
+}
+
+export const DEFAULT_HOUSE_RULES: HouseRules = {
+  gameMode: "zhol", // Default to Zhol
+  ginBonuses: DEFAULT_GIN_BONUSES,
+  eliminationScore: 101,
+  turnTimerSeconds: 30,
+  jokerCount: 2,
+};
+
+// Expand GameState to hold Pishpirik data
+export interface GameState {
+  deck: CardId[];
+  discard: CardId[];
+  turnIdx: number;
+  turnPhase: TurnPhase;
+  turnStartedAt: number;
+  roundNumber: number;
+  lastRoundEnd?: RoundEndInfo;
+  matchOver: boolean;
+  matchWinnerIdx?: number;
+  
+  // --- PISHPIRIK SPECIFIC STATE ---
+  dealerIdx?: number; // Tracks who dealt to rotate properly
+  tablePile?: CardId[]; // The pile of cards in the middle of the table
+  capturedBySeat?: Record<number, CardId[]>; // Tracks what each player has eaten
+  pishpiriksBySeat?: Record<number, number>; // Tracks number of Pishpiriks scored
+  lastCaptureIdx?: number; // Remembers who took last so they get the remaining table cards at the end
+}
+
 // Core domain types for Zhol (Kosovo-style Gin Rummy) — Gin-only variant with jokers.
 
 export type Suit = "S" | "H" | "D" | "C";
