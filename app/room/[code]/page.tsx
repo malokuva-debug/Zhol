@@ -326,14 +326,11 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   const myBoardCount = myPlayerId === 1 ? p1BoardCount : p2BoardCount;
   const enemyBoardCount = enemyPlayerId === 1 ? p1BoardCount : p2BoardCount;
 
-  // Total initial pieces per player in Nine Men's Morris
   const TOTAL_PIECES = 9;
 
-  // We infer unplaced pieces based on board state (assumes pieces placed turn-by-turn up to 9 each)
   const myUnplaced = Math.max(0, TOTAL_PIECES - myBoardCount);
   const enemyUnplaced = Math.max(0, TOTAL_PIECES - enemyBoardCount);
 
-  // Remaining pieces lost/captured
   const myLost = TOTAL_PIECES - (myBoardCount + myUnplaced);
   const enemyLost = TOTAL_PIECES - (enemyBoardCount + enemyUnplaced);
 
@@ -376,7 +373,10 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
         setError("You have placed all 9 pieces! Waiting for opponent to finish placing.");
         return;
       }
-      if (optimisticBoard[ptIdx]) return;
+      if (optimisticBoard[ptIdx]) {
+        setError("Point is already taken!");
+        return;
+      }
 
       setOptimisticBoard((prev) => ({ ...prev, [ptIdx]: myPlayerId }));
 
@@ -430,13 +430,17 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     }
   }
 
+  // Exact coordinates matching the SVG viewbox (10% to 90%)
   const POINTS = [
+    // Outer Square (0-7)
     { x: 10, y: 10 }, { x: 50, y: 10 }, { x: 90, y: 10 },
     { x: 90, y: 50 }, { x: 90, y: 90 }, { x: 50, y: 90 },
     { x: 10, y: 90 }, { x: 10, y: 50 },
+    // Middle Square (8-15)
     { x: 25, y: 25 }, { x: 50, y: 25 }, { x: 75, y: 25 },
     { x: 75, y: 50 }, { x: 75, y: 75 }, { x: 50, y: 75 },
     { x: 25, y: 75 }, { x: 25, y: 50 },
+    // Inner Square (16-23)
     { x: 40, y: 40 }, { x: 50, y: 40 }, { x: 60, y: 40 },
     { x: 60, y: 50 }, { x: 60, y: 60 }, { x: 50, y: 60 },
     { x: 40, y: 60 }, { x: 40, y: 50 },
@@ -458,7 +462,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
             {!isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-pink/20 text-neon-pink px-2 py-0.5 rounded-full animate-pulse">Turn</span>}
           </div>
 
-          {/* Visual Piece Inventory Tray */}
           <div className="flex gap-1 justify-between my-2 bg-black/30 p-2 rounded-xl border border-white/5">
             {Array.from({ length: TOTAL_PIECES }).map((_, idx) => {
               const isPlaced = idx < enemyBoardCount;
@@ -466,14 +469,13 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
               return (
                 <div
                   key={idx}
-                  className={`h-4 w-4 rounded-full border transition-all ${
+                  className={`h-3.5 w-3.5 rounded-full border transition-all ${
                     isPlaced
                       ? "bg-neon-pink border-white shadow-[0_0_6px_#ff5bc8]"
                       : isUnplaced
                       ? "bg-neon-pink/40 border-neon-pink/60"
-                      : "bg-black/50 border-white/10 opacity-30" // Lost/captured
+                      : "bg-black/50 border-white/10 opacity-30"
                   }`}
-                  title={isPlaced ? "On Board" : isUnplaced ? "To Place" : "Captured"}
                 />
               );
             })}
@@ -505,7 +507,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
             {isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-blue/20 text-neon-blue-soft px-2 py-0.5 rounded-full animate-pulse">Your Turn</span>}
           </div>
 
-          {/* Visual Piece Inventory Tray */}
           <div className="flex gap-1 justify-between my-2 bg-black/30 p-2 rounded-xl border border-white/5">
             {Array.from({ length: TOTAL_PIECES }).map((_, idx) => {
               const isPlaced = idx < myBoardCount;
@@ -513,14 +514,13 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
               return (
                 <div
                   key={idx}
-                  className={`h-4 w-4 rounded-full border transition-all ${
+                  className={`h-3.5 w-3.5 rounded-full border transition-all ${
                     isPlaced
                       ? "bg-neon-blue border-white shadow-[0_0_6px_#4dd8ff]"
                       : isUnplaced
                       ? "bg-neon-blue/40 border-neon-blue/60"
-                      : "bg-black/50 border-white/10 opacity-30" // Lost/captured
+                      : "bg-black/50 border-white/10 opacity-30"
                   }`}
-                  title={isPlaced ? "On Board" : isUnplaced ? "To Place" : "Captured"}
                 />
               );
             })}
@@ -575,8 +575,10 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
       {error && <p className="text-neon-pink text-sm font-bold bg-neon-pink/10 px-4 py-1 rounded-lg border border-neon-pink/30">{error}</p>}
 
-      {/* THE BOARD */}
-      <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple">
+      {/* THE BOARD WITH PRECISION ALIGNED INTERSECTIONS */}
+      <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple overflow-hidden">
+        
+        {/* SVG BOARD LINES */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
           {/* Outer Square */}
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
@@ -591,7 +593,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           <line x1="60%" y1="50%" x2="90%" y2="50%" />
         </svg>
 
-        {/* The 24 Intersecting Points */}
+        {/* 24 EXACT INTERSECTION BUTTONS */}
         {POINTS.map((pt, i) => {
           const owner = optimisticBoard[i];
           const isPlayer1 = owner === 1;
@@ -600,19 +602,23 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           return (
             <button
               key={i}
-              className={`absolute w-9 h-9 -ml-4.5 -mt-4.5 rounded-full border-2 transition-all duration-150 hover:scale-125
-                ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-20 shadow-[0_0_15px_#facc15]" : ""}
+              type="button"
+              className={`absolute flex items-center justify-center transition-all duration-150 transform -translate-x-1/2 -translate-y-1/2 rounded-full border-2 cursor-pointer
+                ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-30 shadow-[0_0_15px_#facc15]" : ""}
                 ${
                   owner
                     ? isPlayer1
-                      ? "bg-neon-blue border-white z-10 shadow-[0_0_12px_#4dd8ff]"
-                      : "bg-neon-pink border-white z-10 shadow-[0_0_12px_#ff5bc8]"
-                    : "bg-black/60 border-white/30 hover:border-white hover:bg-white/10 z-0"
+                      ? "w-8 h-8 sm:w-10 sm:h-10 bg-neon-blue border-white z-20 shadow-[0_0_12px_#4dd8ff]"
+                      : "w-8 h-8 sm:w-10 sm:h-10 bg-neon-pink border-white z-20 shadow-[0_0_12px_#ff5bc8]"
+                    : "w-6 h-6 sm:w-8 sm:h-8 bg-[#181335] border-white/30 hover:border-white hover:bg-white/20 z-10"
                 }
               `}
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
               onClick={() => handlePointClick(i)}
-            />
+            >
+              {/* Visible dot indicator for empty spots */}
+              {!owner && <span className="w-2 h-2 rounded-full bg-white/40" />}
+            </button>
           );
         })}
       </div>
