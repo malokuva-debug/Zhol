@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, forwardRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { getNickname, getClientId } from "@/lib/client-id";
 import { useLiveData } from "@/lib/use-live-data";
 import { roomChannel, EVENTS } from "@/lib/pusher";
@@ -255,6 +255,8 @@ function GameBoard({
   const router = useRouter();
   const clientId = getClientId();
   const you = room.seats[yourSeat];
+  const discardRef = useRef<HTMLDivElement>(null);
+  const ginRef = useRef<HTMLButtonElement>(null);
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
   const canAct = isYourTurn && game.turnPhase === "discard";
 
@@ -264,6 +266,36 @@ function GameBoard({
     () => resolveJokerPlaceholders(deadwoodInfo.melds, jokersInHand),
     [deadwoodInfo, jokersInHand]
   );
+
+  const handleDragEnd = (cardId: string, info: PanInfo) => {
+    if (!canAct) return;
+    const { x, y } = info.point;
+
+    const checkZone = (ref: React.RefObject<HTMLElement>) => {
+      if (!ref.current) return false;
+      const rect = ref.current.getBoundingClientRect();
+      // Generous 20px padding around the drop zones
+      return x >= rect.left - 20 && x <= rect.right + 20 && y >= rect.top - 20 && y <= rect.bottom + 20;
+    };
+
+    const achievesGin = canGin(game.yourHand.filter((c) => c !== cardId));
+
+    if (checkZone(ginRef)) {
+      if (achievesGin) {
+        sendMove({ action: "gin", cardId });
+      } else {
+        setActionError("That card does not result in a valid Gin.");
+      }
+    } else if (checkZone(discardRef) || info.offset.y < -150) {
+      // If dropped on the center pile OR flicked upwards significantly (>150px)
+      if (achievesGin) {
+        sendMove({ action: "gin", cardId }); // Auto-gin if the flicked discard solves the hand!
+      } else {
+        sendMove({ action: "discard", cardId });
+      }
+    }
+  };
+  
   const meldIndexByCard = useMemo(() => {
     const map: Record<string, number> = {};
     resolvedMelds.forEach((m, idx) => m.cards.forEach((c) => (map[c] = idx)));
@@ -406,7 +438,7 @@ function GameBoard({
           <TurnTimer startedAt={game.turnStartedAt} seconds={game.turnTimerSeconds} active={!game.matchOver} />
         </div>
 
-        <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
+        <div className={`flex items-center justify-center gap-10 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
           <div className="relative h-32 w-24 sm:h-36 sm:w-28">
             {/* Stock — vertical, straight */}
             <button
@@ -482,9 +514,9 @@ function GameBoard({
             <span className={deadwoodInfo.deadwood === 0 ? "text-neon-blue-soft" : "text-white"}>{deadwoodInfo.deadwood}</span>
           </span>
           <div className="flex flex-wrap gap-2">
-            <ActionButton disabled={!canDeclareGin} onClick={() => sendMove({ action: "gin", cardId: ginDiscardCard })} variant="purple">
-              Zhol! (Gin)
-            </ActionButton>
+            <ActionButton ref={ginRef} disabled={!canDeclareGin} onClick={() => sendMove({ action: "gin", cardId: ginDiscardCard })} variant="purple">
+  Zhol! (Gin)
+</ActionButton>
             <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard })} variant="ghost">
               Discard
             </ActionButton>
@@ -496,6 +528,7 @@ function GameBoard({
   onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)}
   interactive={canAct && !showingScore}
   meldIndexByCard={meldIndexByCard}
+  onDragEnd={handleDragEnd} // ADD THIS LINE
 />
       </div>
 
@@ -525,25 +558,25 @@ function seatPosition(index: number, opponentCount: number): { x: number; y: num
   return { x: 50 + 42 * Math.cos(rad), y: 50 + 40 * Math.sin(rad) };
 }
 
-function ActionButton({
-  children,
-  disabled,
-  onClick,
-  variant,
-}: {
-  children: React.ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-  variant: "blue" | "purple" | "pink" | "ghost";
-}) {
+const ActionButton = forwardRef<
+  HTMLButtonElement,
+  {
+    children: React.ReactNode;
+    disabled?: boolean;
+    onClick: () => void;
+    variant: "blue" | "purple" | "pink" | "ghost";
+  }
+>(({ children, disabled, onClick, variant }, ref) => {
   const styles = {
     blue: "bg-neon-blue/20 text-neon-blue-soft hover:bg-neon-blue/30",
     purple: "bg-neon-purple/20 text-neon-purple-soft hover:bg-neon-purple/30",
     pink: "bg-neon-pink/20 text-neon-pink hover:bg-neon-pink/30",
     ghost: "bg-white/10 text-white/80 hover:bg-white/20",
   }[variant];
+
   return (
     <button
+      ref={ref}
       disabled={disabled}
       onClick={onClick}
       className={`rounded-lg px-3 py-1.5 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-25 ${styles}`}
@@ -551,7 +584,8 @@ function ActionButton({
       {children}
     </button>
   );
-}
+});
+ActionButton.displayName = "ActionButton";
 
 function PlayerStrip({
   nickname,
