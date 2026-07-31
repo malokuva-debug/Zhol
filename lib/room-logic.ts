@@ -1,4 +1,6 @@
-import { Room, SeatState, ClientGameState } from "./types";
+import { Room, SeatState, ClientGameState, HouseRules } from "./types";
+
+const RECONNECT_WINDOW_MS = 60_000;
 
 export function newRoom(opts: {
   name: string;
@@ -57,11 +59,96 @@ export function addSystemMessage(room: Room, msg: string) {
   if (room.systemMessages.length > 50) room.systemMessages.shift();
 }
 
+export function tryJoinRoom(
+  room: Room,
+  nickname: string,
+  clientId: string,
+  password?: string,
+  team?: 1 | 2
+): { ok: boolean; seatIdx?: number; error?: string } {
+  if (room.visibility === "private" && room.passwordHash) {
+    if (password !== room.passwordHash) {
+      return { ok: false, error: "Incorrect password." };
+    }
+  }
+
+  // Check if player is reconnecting to an existing seat
+  const existingIdx = room.seats.findIndex((s) => s?.clientId === clientId);
+  if (existingIdx !== -1) {
+    const seat = room.seats[existingIdx]!;
+    seat.connected = true;
+    seat.lastSeenAt = Date.now();
+    seat.nickname = nickname;
+    if (team) seat.team = team;
+    return { ok: true, seatIdx: existingIdx };
+  }
+
+  if (room.status !== "waiting") {
+    return { ok: false, error: "Game already in progress." };
+  }
+
+  const freeIdx = room.seats.findIndex((s) => s === null);
+  if (freeIdx === -1) {
+    return { ok: false, error: "Room is full." };
+  }
+
+  room.seats[freeIdx] = {
+    nickname,
+    clientId,
+    connected: true,
+    lastSeenAt: Date.now(),
+    ready: false,
+    hand: [],
+    score: 0,
+    eliminated: false,
+    team: room.rules.teamMode === "2v2" ? team || 1 : undefined,
+  };
+
+  addSystemMessage(room, `${nickname} joined the room.`);
+  return { ok: true, seatIdx: freeIdx };
+}
+
+export function markLeft(room: Room, clientId: string) {
+  const idx = room.seats.findIndex((s) => s?.clientId === clientId);
+  if (idx === -1) return;
+
+  if (room.status === "waiting") {
+    const nick = room.seats[idx]?.nickname;
+    room.seats[idx] = null;
+    if (nick) addSystemMessage(room, `${nick} left the room.`);
+  } else {
+    const seat = room.seats[idx];
+    if (seat) {
+      seat.connected = false;
+      seat.lastSeenAt = Date.now();
+    }
+  }
+}
+
+export function canStart(room: Room, clientId: string): { ok: boolean; error?: string } {
+  if (room.hostClientId !== clientId) {
+    return { ok: false, error: "Only the host can start the game." };
+  }
+  const activeSeats = room.seats.filter((s) => s !== null);
+  if (activeSeats.length < 2) {
+    return { ok: false, error: "Need at least 2 players to start." };
+  }
+  if (!activeSeats.every((s) => s?.ready)) {
+    return { ok: false, error: "All players must be ready." };
+  }
+  return { ok: true };
+}
+
+export function startGame(room: Room) {
+  room.status = "playing";
+  initializeGame(room);
+  addSystemMessage(room, "The match has started!");
+}
+
 export function initializeGame(room: Room) {
   const mode = room.rules.gameMode;
   
   if (mode === "cicmic") {
-    // 24-point board initialized with explicit nulls
     const board: Record<number, 1 | 2 | null> = {};
     for (let i = 0; i < 24; i++) board[i] = null;
 
@@ -85,10 +172,8 @@ export function initializeGame(room: Room) {
     const deck = generateStandardDeck();
     shuffle(deck);
 
-    // Deal 4 cards to table
     const tablePile = deck.splice(0, 4);
 
-    // Deal 4 cards to each active player
     room.seats.forEach((seat) => {
       if (seat) {
         seat.hand = deck.splice(0, 4);
@@ -112,7 +197,7 @@ export function initializeGame(room: Room) {
     return;
   }
 
-  // Zhol (Standard Gin Rummy setup)
+  // Zhol setup
   const deck = generateZholDeck(room.seats.filter(Boolean).length);
   shuffle(deck);
 
@@ -136,6 +221,54 @@ export function initializeGame(room: Room) {
     discard: topDiscard ? [topDiscard] : [],
     discardTop: topDiscard,
     matchOver: false,
+  };
+}
+
+export function isSeatExpired(seat: SeatState): boolean {
+  return !seat.connected && Date.now() - seat.lastSeenAt > RECONNECT_WINDOW_MS;
+}
+
+export function redactRoomForClient(room: Room) {
+  const { passwordHash, ...rest } = room;
+  return rest;
+}
+
+export function toClientGameState(room: Room, yourSeat: number | null): ClientGameState | null {
+  if (!room.game) return null;
+
+  const yourHand = yourSeat !== null && room.seats[yourSeat] ? room.seats[yourSeat]!.hand : [];
+  const opponents = room.seats
+    .map((s, idx) => {
+      if (idx === yourSeat || !s) return null;
+      return {
+        seatIdx: idx,
+        nickname: s.nickname,
+        connected: s.connected,
+        cardCount: s.hand.length,
+        score: s.score,
+        eliminated: s.eliminated,
+        team: s.team,
+      };
+    })
+    .filter((o): o is NonNullable<typeof o> => o !== null);
+
+  return {
+    roundNumber: room.game.roundNumber,
+    turnIdx: room.game.turnIdx,
+    turnPhase: room.game.turnPhase,
+    turnStartedAt: room.game.turnStartedAt,
+    turnTimerSeconds: room.rules.turnTimerSeconds,
+    deck: room.game.deck,
+    discard: room.game.discard,
+    discardTop: room.game.discardTop,
+    yourHand,
+    opponents,
+    matchOver: room.game.matchOver,
+    matchWinnerIdx: room.game.matchWinnerIdx,
+    lastRoundEnd: room.game.lastRoundEnd,
+    tablePile: room.game.tablePile,
+    board: room.game.board,
+    pendingRemoval: room.game.pendingRemoval,
   };
 }
 
@@ -193,7 +326,6 @@ export function applyDiscard(room: Room, seatIdx: number, cardId: string) {
   room.game.discard.push(cardId);
   room.game.discardTop = cardId;
 
-  // Pass turn clockwise
   const activeIndices = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
   let nextIdx = activeIndices.findIndex((i) => i === seatIdx) + 1;
   if (nextIdx >= activeIndices.length) nextIdx = 0;
