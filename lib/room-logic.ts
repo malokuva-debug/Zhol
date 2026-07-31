@@ -328,7 +328,7 @@ export function toClientGameState(room: Room, viewerSeat: number): ClientGameSta
 
   return {
     yourSeat: viewerSeat,
-    deckCount: g.deck.length,
+    deck: g.deck, // Send the actual deck array instead of deckCount
     discardTop: g.discard.length ? g.discard[g.discard.length - 1] : null,
     discard: g.discard,
     yourHand: seat.hand,
