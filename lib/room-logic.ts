@@ -141,8 +141,28 @@ export function startNewRound(room: Room, roundNumber: number): GameState {
   const active = activeIdx(room);
   // Turn order rotates clockwise each round
   const dealerIdx = active[(roundNumber - 1) % active.length];
-  const startSeat = active[roundNumber % active.length]; // Player after dealer starts
+  const startSeat = active[roundNumber % active.length];
 
+  // --- CICMIC INITIALIZATION ---
+  if (room.rules.gameMode === "cicmic") {
+    const board: Record<number, 1 | 2 | null> = {};
+    for (let i = 0; i < 24; i++) board[i] = null; // 24 empty points
+
+    return {
+      deck: [], discard: [], // Not used in Cicmic
+      turnIdx: startSeat,
+      turnPhase: "discard", // Reusing this to mean "Waiting for player move"
+      turnStartedAt: Date.now(),
+      roundNumber,
+      matchOver: false,
+      board,
+      unplacedPieces: { 1: 9, 2: 9 },
+      piecesOnBoard: { 1: 0, 2: 0 },
+      cicmicPhase: { 1: "placement", 2: "placement" },
+      pendingRemoval: false,
+    };
+  }
+  
   if (room.rules.gameMode === "pishpirik") {
     // --- PISHPIRIK DEALING ---
     const deck = shuffle(freshDeckIds(1, 0)); // 52 cards, no jokers
