@@ -12,16 +12,6 @@ const MELD_RING_COLORS = [
   "ring-2 ring-amber-400/70",
 ];
 
-/**
- * Renders the player's hand as a held card-fan: same baseline for every
- * card (no vertical staggering), horizontal overlap, a slight rotation per
- * card, and z-index strictly increasing left-to-right (leftmost card sits
- * behind, each next card stacks above the previous, rightmost is on top) —
- * never alternating. Drag-reorders to sort, purely a local display
- * preference that never touches game state. Cards belonging to the same
- * meld (per `meldIndexByCard`) get a matching colored ring so the player can
- * see their groupings at a glance.
- */
 export default function HandFan({
   cards,
   selectedCard,
@@ -29,6 +19,7 @@ export default function HandFan({
   interactive,
   meldIndexByCard,
   onDragEnd,
+  insertAtX, // NEW PROP: X-coordinate of where the card was dropped
 }: {
   cards: CardId[];
   selectedCard: string | null;
@@ -36,6 +27,7 @@ export default function HandFan({
   interactive: boolean;
   meldIndexByCard?: Record<string, number>;
   onDragEnd?: (id: string, info: PanInfo) => void;
+  insertAtX?: number | null; 
 }) {
   const [order, setOrder] = useState<CardId[]>(cards);
 
@@ -43,9 +35,30 @@ export default function HandFan({
     setOrder((prev) => {
       const stillHere = prev.filter((id) => cards.includes(id));
       const added = cards.filter((id) => !prev.includes(id));
+
+      if (added.length === 0) return stillHere;
+
+      // If we have an X coordinate for the drop, estimate where it goes in the hand
+      if (insertAtX !== undefined && insertAtX !== null) {
+        const screenWidth = window.innerWidth;
+        // Hand fan takes up roughly the middle 80% of the screen
+        const startX = screenWidth * 0.1; 
+        const endX = screenWidth * 0.9;
+        
+        let pct = (insertAtX - startX) / (endX - startX);
+        pct = Math.max(0, Math.min(1, pct)); // clamp between 0 and 1
+        
+        const targetIndex = Math.floor(pct * (stillHere.length + 1));
+        
+        const newOrder = [...stillHere];
+        newOrder.splice(targetIndex, 0, ...added);
+        return newOrder;
+      }
+
+      // Default: just put it at the end
       return [...stillHere, ...added];
     });
-  }, [cards]);
+  }, [cards, insertAtX]);
 
   const n = order.length;
   const center = (n - 1) / 2;
@@ -71,7 +84,7 @@ export default function HandFan({
           <Reorder.Item
             key={id}
             value={id}
-            drag={interactive ? true : "x"} // Override to allow 2D dragging out of the fan
+            drag={interactive ? true : "x"}
             onDragEnd={(e, info) => {
               if (interactive && onDragEnd) onDragEnd(id, info);
             }}
@@ -82,10 +95,7 @@ export default function HandFan({
             whileDrag={{ scale: 1.08, zIndex: 200 }}
             className="cursor-grab touch-none active:cursor-grabbing"
           >
-            {/* Fan rotation lives here, isolated from Reorder's own drag transform.
-                Same vertical baseline for every card — only rotation + a fixed
-                lift-on-select, no per-position vertical staggering. */}
-           <div
+            <div
               style={{
                 transform: `rotate(${rotate}deg) translateY(${isSelected ? -20 : 0}px)`,
                 transformOrigin: "bottom center",
@@ -94,10 +104,10 @@ export default function HandFan({
             >
               <div className={`rounded-lg ${ringClass}`}>
                 <PlayingCard 
-                   id={id} 
-                   selected={isSelected} 
-                   onClick={interactive ? () => onSelect(id) : undefined} 
-                   layoutId={`card-${id}`} // ADDED THIS LINE
+                  id={id} 
+                  selected={isSelected} 
+                  onClick={interactive ? () => onSelect(id) : undefined} 
+                  layoutId={`card-${id}`} 
                 />
               </div>
             </div>
