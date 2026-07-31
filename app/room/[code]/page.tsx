@@ -404,6 +404,29 @@ function GameBoard({
     router.push("/lobby");
   }
 
+  async function leave() {
+    removeRecentRoom(code);
+    await fetch(`/api/rooms/${code}/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    });
+    router.push("/lobby");
+  }
+
+  // --- ADD THESE LINES ---
+  const isHost = room.hostClientId === clientId;
+
+  async function kickPlayer(targetClientId: string) {
+    if (!confirm("Are you sure you want to kick this player?")) return;
+    await fetch(`/api/rooms/${code}/kick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, targetClientId }),
+    });
+  }
+  // -----------------------
+
   const handleDragEnd = (cardId: string, info: PanInfo) => {
     if (!canAct) return;
     const { x, y } = info.point;
@@ -499,6 +522,8 @@ function GameBoard({
       <div className="relative h-48 sm:h-56">
         {displayGame.opponents.map((opp, i) => {
           const pos = seatPosition(i, displayGame.opponents.length);
+          const oppClientId = room.seats[opp.seatIdx]?.clientId; // Grab their ID
+
           return (
             <div
               key={opp.seatIdx}
@@ -514,6 +539,17 @@ function GameBoard({
                 isTurn={displayGame.turnIdx === opp.seatIdx}
                 faceDown
               />
+              
+              {/* --- KICK BUTTON FOR HOST --- */}
+              {isHost && oppClientId && (
+                <button
+                  onClick={() => kickPlayer(oppClientId)}
+                  className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
+                >
+                  Kick
+                </button>
+              )}
+
               {!opp.eliminated && (
                 <div className="flex justify-center">
                   <OpponentFan count={showingScore ? 0 : opp.cardCount} />
