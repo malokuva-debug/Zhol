@@ -9,6 +9,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   const router = useRouter();
   const [name, setName] = useState(`${nickname}'s table`);
   const [gameMode, setGameMode] = useState<"zhol" | "pishpirik" | "cicmic">("zhol");
+  const [teamMode, setTeamMode] = useState<"1v1" | "2v2">("1v1"); // NEW
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [password, setPassword] = useState("");
   const [maxPlayers, setMaxPlayers] = useState(2);
@@ -20,6 +21,11 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   async function handleCreate() {
     setBusy(true);
     setError("");
+    body: JSON.stringify({
+          name,
+          gameMode,
+          teamMode, // PASS IT HERE
+          visibility,
 
     try {
       const res = await fetch("/api/rooms", {
@@ -77,6 +83,29 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
               ))}
             </div>
           </div>
+
+          {/* TEAM MODE SELECTION (Only show if not Cicmic) */}
+          {gameMode !== "cicmic" && (
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Format</label>
+              <div className="flex gap-2">
+                {(["1v1", "2v2"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setTeamMode(mode);
+                      if (mode === "2v2") setMaxPlayers(4); // Force 4 players for 2v2
+                    }}
+                    className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold uppercase transition ${
+                      teamMode === mode ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft" : "border-white/10 text-white/50 hover:bg-white/5"
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Room name</label>
