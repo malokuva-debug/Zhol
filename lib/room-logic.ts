@@ -138,21 +138,43 @@ function nextActiveIdx(room: Room, from: number): number {
 }
 
 export function startNewRound(room: Room, roundNumber: number): GameState {
+  const active = activeIdx(room);
+  // Turn order rotates clockwise each round
+  const dealerIdx = active[(roundNumber - 1) % active.length];
+  const startSeat = active[roundNumber % active.length]; // Player after dealer starts
+
+  if (room.rules.gameMode === "pishpirik") {
+    // --- PISHPIRIK DEALING ---
+    const deck = shuffle(freshDeckIds(1, 0)); // 52 cards, no jokers
+    const tablePile = deck.splice(0, 4); // 4 to the middle
+    
+    // Deal 4 to each player
+    for (const i of active) {
+      room.seats[i]!.hand = deck.splice(0, 4);
+    }
+
+    return {
+      deck,
+      discard: [], // Not used in Pishpirik
+      tablePile,
+      capturedBySeat: {},
+      pishpiriksBySeat: {},
+      dealerIdx,
+      turnIdx: startSeat,
+      turnPhase: "discard", // Reusing 'discard' to mean 'play a card'
+      turnStartedAt: Date.now(),
+      roundNumber,
+      matchOver: false,
+    };
+  }
+
+  // --- ZHOL DEALING (Existing logic) ---
   const numDecks = decksForPlayerCount(room.maxPlayers);
   const deck = shuffle(freshDeckIds(numDecks, room.rules.jokerCount === 4 ? 4 : 2));
-  const active = activeIdx(room);
-
-  // Turn order is clockwise = ascending seat index, wrapping. Who deals/starts
-  // rotates by one seat each round.
-  const startSeat = active[roundNumber % active.length];
-
+  
   for (const i of active) {
     room.seats[i]!.hand = deck.splice(0, 10);
   }
-  // The starting player is dealt an 11th card and must immediately discard
-  // (or declare Gin) — no draw on their very first turn. Everyone else draws
-  // normally on their turn. The discard pile starts empty and is seeded by
-  // that first discard.
   room.seats[startSeat]!.hand.push(deck.pop()!);
 
   return {
