@@ -28,12 +28,14 @@ export default function HandFan({
   onSelect,
   interactive,
   meldIndexByCard,
+  onDragEnd,
 }: {
   cards: CardId[];
   selectedCard: string | null;
   onSelect: (id: string) => void;
   interactive: boolean;
   meldIndexByCard?: Record<string, number>;
+  onDragEnd?: (id: string, info: PanInfo) => void;
 }) {
   const [order, setOrder] = useState<CardId[]>(cards);
 
@@ -69,9 +71,13 @@ export default function HandFan({
           <Reorder.Item
             key={id}
             value={id}
+            drag={interactive ? true : "x"} // Override to allow 2D dragging out of the fan
+            onDragEnd={(e, info) => {
+              if (interactive && onDragEnd) onDragEnd(id, info);
+            }}
             style={{
               marginLeft: i === 0 ? 0 : -overlapPx,
-              zIndex: isSelected ? 100 : i, // monotonic left-to-right, never alternating
+              zIndex: isSelected ? 100 : i,
             }}
             whileDrag={{ scale: 1.08, zIndex: 200 }}
             className="cursor-grab touch-none active:cursor-grabbing"
