@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Reorder } from "framer-motion";
+import { Reorder, PanInfo } from "framer-motion";
 import PlayingCard from "./PlayingCard";
 import type { CardId } from "@/lib/types";
 
