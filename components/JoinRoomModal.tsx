@@ -46,6 +46,33 @@ export default function JoinRoomModal({
     }
   }
 
+  // Add this state
+  const [team, setTeam] = useState<1 | 2>(1);
+
+  // Update the fetch payload
+  body: JSON.stringify({ nickname, clientId, password: password || undefined, team }),
+
+  // Add the UI inside the modal (below the password input):
+  {room?.rules?.teamMode === "2v2" && (
+    <div className="mt-4">
+      <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Choose Team</label>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setTeam(1)}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${team === 1 ? "border-neon-blue bg-neon-blue/20 text-neon-blue-soft" : "border-white/10 text-white/50"}`}
+        >
+          Team 1
+        </button>
+        <button
+          onClick={() => setTeam(2)}
+          className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition ${team === 2 ? "border-neon-pink bg-neon-pink/20 text-neon-pink" : "border-white/10 text-white/50"}`}
+        >
+          Team 2
+        </button>
+      </div>
+    </div>
+  )}
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm" onClick={onClose}>
       <motion.div
