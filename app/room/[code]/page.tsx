@@ -106,17 +106,26 @@ export default function RoomPage() {
     <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
       <RoomHeader room={room} clientId={clientId} />
       {room.status === "waiting" && <WaitingRoom room={room} yourSeat={yourSeat} clientId={clientId} code={code} />}
+      
       {room.status !== "waiting" && game && yourSeat !== null && (
-        <GameBoard
-          room={room}
-          game={game}
-          yourSeat={yourSeat}
-          code={code}
-          selectedCard={selectedCard}
-          setSelectedCard={setSelectedCard}
-          actionError={actionError}
-          setActionError={setActionError}
-        />
+        <>
+          {room.rules.gameMode === "cicmic" ? (
+            <CicmicBoard room={room} game={game} yourSeat={yourSeat} code={code} />
+          ) : room.rules.gameMode === "pishpirik" ? (
+            <div className="text-center text-white/50 mt-20">Pishpirik Board Coming Soon...</div>
+          ) : (
+            <GameBoard
+              room={room}
+              game={game}
+              yourSeat={yourSeat}
+              code={code}
+              selectedCard={selectedCard}
+              setSelectedCard={setSelectedCard}
+              actionError={actionError}
+              setActionError={setActionError}
+            />
+          )}
+        </>
       )}
     </main>
   );
@@ -776,6 +785,88 @@ function PlayerStrip({
         {faceDown && !eliminated && <span className="text-xs text-white/40">• {cardCount} cards</span>}
       </div>
       <ScoreBadge score={score} className="text-lg text-neon-blue-soft" />
+    </div>
+  );
+}
+
+function CicmicBoard({
+  room,
+  game,
+  yourSeat,
+  code,
+}: {
+  room: Omit<Room, "passwordHash">;
+  game: ClientGameState;
+  yourSeat: number;
+  code: string;
+}) {
+  const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
+  const board = game.board || {};
+
+  // 24 standard coordinates for Nine Men's Morris (x, y percentages)
+  const POINTS = [
+    // Outer
+    { x: 10, y: 10 }, { x: 50, y: 10 }, { x: 90, y: 10 },
+    { x: 90, y: 50 }, { x: 90, y: 90 }, { x: 50, y: 90 },
+    { x: 10, y: 90 }, { x: 10, y: 50 },
+    // Middle
+    { x: 25, y: 25 }, { x: 50, y: 25 }, { x: 75, y: 25 },
+    { x: 75, y: 50 }, { x: 75, y: 75 }, { x: 50, y: 75 },
+    { x: 25, y: 75 }, { x: 25, y: 50 },
+    // Inner
+    { x: 40, y: 40 }, { x: 50, y: 40 }, { x: 60, y: 40 },
+    { x: 60, y: 50 }, { x: 60, y: 60 }, { x: 50, y: 60 },
+    { x: 40, y: 60 }, { x: 40, y: 50 },
+  ];
+
+  return (
+    <div className="flex flex-col items-center gap-8">
+      <div className="text-center">
+        <h2 className="text-2xl font-black text-glow-purple">Cicmic (Mills)</h2>
+        <p className="text-white/60">
+          {isYourTurn ? (game.pendingRemoval ? "Remove an opponent's piece!" : "Your turn!") : "Waiting for opponent..."}
+        </p>
+      </div>
+
+      {/* The Board */}
+      <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-xl border border-white/10 p-4">
+        {/* Draw the lines for the concentric squares */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
+          {/* Outer Square */}
+          <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
+          {/* Middle Square */}
+          <rect x="25%" y="25%" width="50%" height="50%" fill="none" />
+          {/* Inner Square */}
+          <rect x="40%" y="40%" width="20%" height="20%" fill="none" />
+          {/* Cross Lines */}
+          <line x1="50%" y1="10%" x2="50%" y2="40%" />
+          <line x1="50%" y1="60%" x2="50%" y2="90%" />
+          <line x1="10%" y1="50%" x2="40%" y2="50%" />
+          <line x1="60%" y1="50%" x2="90%" y2="50%" />
+        </svg>
+
+        {/* Render the 24 clickable points */}
+        {POINTS.map((pt, i) => {
+          const owner = board[i];
+          const isPlayer1 = owner === 1;
+          const isPlayer2 = owner === 2;
+
+          return (
+            <button
+              key={i}
+              className={`absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-2 transition-transform hover:scale-125
+                ${owner ? (isPlayer1 ? "bg-neon-blue border-white" : "bg-neon-pink border-white") : "bg-black/50 border-white/30 hover:border-white"}
+              `}
+              style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
+              onClick={() => {
+                if (!isYourTurn) return;
+                // Here you will hook up the sendMove({ action: "cicmic_place", point: i }) logic!
+                console.log("Clicked point", i);
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
