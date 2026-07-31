@@ -1,54 +1,52 @@
-// Core domain types for Zhol (Kosovo-style Gin Rummy) — Gin-only variant with jokers.
+// Core domain types for Zhol, Pishpirik, and Cicmic
 
 export type Suit = "S" | "H" | "D" | "C";
 export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
 
-/** Card id, e.g. "AS", "10H". Jokers are "JK1"/"JK2" (or "JK3"/"JK4" in 2-deck mode). */
+/** Card id, e.g. "AS", "10H". Jokers are "JK1"/"JK2" */
 export type CardId = string;
 
 export interface Card {
   id: CardId;
   rank: Rank | "JOKER";
   suit: Suit | null;
-  value: number; // number cards = face value; A/J/Q/K = 10; joker = 0 while held as a wildcard in a meld
+  value: number;
   isJoker: boolean;
 }
 
 export type MeldType = "set" | "run";
-
 export interface Meld {
   type: MeldType;
-  cards: CardId[]; // includes any joker(s) used as wildcards in this meld
+  cards: CardId[];
 }
 
 export type RoomStatus = "waiting" | "playing" | "finished";
 export type Visibility = "public" | "private";
 
-/**
- * Win categories and their bonus points, added to a losing player's running
- * total on top of their own deadwood value.
- *   normal_gin        — fully melded hand, no joker used, not all one suit
- *   joker_gin         — fully melded hand, at least one joker used as a wildcard
- *   suit_gin          — fully melded hand, every card the same suit, no joker
- *   suit_joker_gin    — fully melded hand, every non-joker card the same suit, joker used
- */
 export type GinType = "normal_gin" | "joker_gin" | "suit_gin" | "suit_joker_gin";
-
-export interface HouseRules {
-  ginBonuses: Record<GinType, number>;
-  eliminationScore: number; // reaching/exceeding this score eliminates a player (default 101)
-  turnTimerSeconds: number; // 0 = no timer
-  jokerCount: 0 | 2 | 4; // 2 for a single 52-card deck, 4 if you want extra wildcards in 2-deck games
-}
 
 export const DEFAULT_GIN_BONUSES: Record<GinType, number> = {
   normal_gin: 10,
-  joker_gin: 20,
-  suit_gin: 25,
+  joker_gin: 25,
+  suit_gin: 20,
   suit_joker_gin: 50,
 };
 
+// --- NEW GAME MODES ---
+export type GameMode = "zhol" | "pishpirik" | "cicmic";
+export type CicmicPlayer = 1 | 2;
+export type CicmicPhase = "placement" | "movement" | "flying";
+
+export interface HouseRules {
+  gameMode: GameMode; // Required for room-logic to branch correctly
+  ginBonuses: Record<GinType, number>;
+  eliminationScore: number;
+  turnTimerSeconds: number;
+  jokerCount: 0 | 2 | 4;
+}
+
 export const DEFAULT_HOUSE_RULES: HouseRules = {
+  gameMode: "zhol", // Defaults to Zhol
   ginBonuses: DEFAULT_GIN_BONUSES,
   eliminationScore: 101,
   turnTimerSeconds: 30,
@@ -62,7 +60,7 @@ export interface SeatState {
   lastSeenAt: number;
   ready: boolean;
   hand: CardId[];
-  score: number; // penalty points accumulated; reaching eliminationScore eliminates this seat
+  score: number;
   eliminated: boolean;
 }
 
@@ -72,14 +70,9 @@ export interface RoundEndInfo {
   type: GinType;
   winnerIdx: number;
   winnerMelds: Meld[];
-  winnerBonus: number; // subtracted from the winner's score
-  pointsBySeat: { seatIdx: number; deadwood: number; deadCards: CardId[]; eliminated: boolean }[]; // added to each loser's score
+  winnerBonus: number;
+  pointsBySeat: { seatIdx: number; deadwood: number; deadCards: CardId[]; eliminated: boolean }[];
 }
-
-export type GameMode = "zhol" | "pishpirik" | "cicmic"; // Added cicmic
-
-export type CicmicPlayer = 1 | 2;
-export type CicmicPhase = "placement" | "movement" | "flying";
 
 export interface GameState {
   deck: CardId[];
@@ -100,11 +93,11 @@ export interface GameState {
   lastCaptureIdx?: number;
 
   // --- CICMIC STATE ---
-  board?: Record<number, CicmicPlayer | null>; // Points 0-23 on the board
-  unplacedPieces?: Record<CicmicPlayer, number>; // Starts at 9 each
-  piecesOnBoard?: Record<CicmicPlayer, number>; // Tracks when a player drops to 3 (flying phase)
+  board?: Record<number, CicmicPlayer | null>;
+  unplacedPieces?: Record<CicmicPlayer, number>;
+  piecesOnBoard?: Record<CicmicPlayer, number>;
   cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
-  pendingRemoval?: boolean; // True if the current player just formed a mill and gets to remove an opponent's piece
+  pendingRemoval?: boolean;
 }
 
 export interface ChatMessage {
@@ -121,11 +114,11 @@ export interface Room {
   visibility: Visibility;
   passwordHash?: string;
   rules: HouseRules;
-  maxPlayers: number; // 2-6
+  maxPlayers: number;
   status: RoomStatus;
   hostClientId: string;
   createdAt: number;
-  seats: (SeatState | null)[]; // length === maxPlayers
+  seats: (SeatState | null)[];
   game: GameState | null;
   chat: ChatMessage[];
 }
@@ -154,7 +147,7 @@ export interface ClientOpponentView {
 
 export interface ClientGameState {
   yourSeat: number;
-  deck: CardId[]; // Changed from deckCount: number
+  deck: CardId[];
   discardTop: CardId | null;
   discard: CardId[];
   yourHand: CardId[];
@@ -167,4 +160,15 @@ export interface ClientGameState {
   lastRoundEnd?: RoundEndInfo;
   matchOver: boolean;
   matchWinnerIdx?: number;
+  
+  // Expose new modes to client safely
+  dealerIdx?: number;
+  tablePile?: CardId[];
+  capturedBySeat?: Record<number, CardId[]>;
+  pishpiriksBySeat?: Record<number, number>;
+  board?: Record<number, CicmicPlayer | null>;
+  unplacedPieces?: Record<CicmicPlayer, number>;
+  piecesOnBoard?: Record<CicmicPlayer, number>;
+  cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
+  pendingRemoval?: boolean;
 }
