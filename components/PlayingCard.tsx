@@ -31,12 +31,24 @@ export default function PlayingCard({
   layoutId?: string;
 }) {
   const dims = small ? "h-16 w-11 text-[10px]" : "h-24 w-16 text-sm sm:h-28 sm:w-[4.5rem] sm:text-base";
+  const isHidden = faceDown || !id || id === "__DRAWING__";
 
-  // Handle nulls and our optimistic drawing placeholder
-  if (faceDown || !id || id === "__DRAWING__") {
+  // The Magic Flip: Face-up cards start rotated at 90deg (invisible edge) and flip to 0deg.
+  // Hidden cards (like the deck and the dragging placeholder) skip the entrance animation.
+  const motionProps = {
+    layoutId,
+    onClick,
+    initial: isHidden ? undefined : { rotateY: -90, scale: 0.8, opacity: 0.5 },
+    animate: { rotateY: 0, scale: 1, opacity: 1, y: selected ? -14 : 0 },
+    whileHover: onClick ? { y: -8, scale: 1.04 } : undefined,
+    whileTap: onClick ? { scale: 0.97 } : undefined,
+    transition: { type: "spring", bounce: 0.4, duration: 0.5 },
+  };
+
+  if (isHidden) {
     return (
       <motion.div
-        layoutId={layoutId}
+        {...motionProps}
         className={`${dims} rounded-lg border border-neon-purple/40 bg-gradient-to-br from-[#2a1a55] to-[#150c33] shadow-lg`}
         style={{
           backgroundImage:
@@ -49,11 +61,7 @@ export default function PlayingCard({
   if (isJokerCard(id)) {
     return (
       <motion.button
-        layoutId={layoutId}
-        onClick={onClick}
-        whileHover={onClick ? { y: -8, scale: 1.04 } : undefined}
-        whileTap={onClick ? { scale: 0.97 } : undefined}
-        animate={selected ? { y: -14 } : { y: 0 }}
+        {...motionProps}
         className={`${dims} relative flex flex-col items-center justify-center rounded-lg border bg-gradient-to-br from-[#ff5bc8] via-[#a35bff] to-[#4dd8ff] px-1.5 py-1 shadow-[0_4px_14px_rgba(0,0,0,0.4)] ${
           selected ? "border-white ring-2 ring-white/80" : "border-black/10"
         } ${onClick ? "cursor-pointer" : "cursor-default"}`}
@@ -69,11 +77,7 @@ export default function PlayingCard({
 
   return (
     <motion.button
-      layoutId={layoutId}
-      onClick={onClick}
-      whileHover={onClick ? { y: -8, scale: 1.04 } : undefined}
-      whileTap={onClick ? { scale: 0.97 } : undefined}
-      animate={selected ? { y: -14 } : { y: 0 }}
+      {...motionProps}
       className={`${dims} relative flex flex-col justify-between rounded-lg border bg-gradient-to-br from-white to-slate-100 px-1.5 py-1 shadow-[0_4px_14px_rgba(0,0,0,0.4)] transition-shadow ${
         selected ? "border-neon-blue ring-2 ring-neon-blue/70" : "border-black/10"
       } ${isRed ? "text-red-600" : "text-slate-900"} ${onClick ? "cursor-pointer" : "cursor-default"}`}
