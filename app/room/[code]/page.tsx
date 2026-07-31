@@ -315,6 +315,8 @@ function GameBoard({
   const you = room.seats[yourSeat];
   const [dropX, setDropX] = useState<number | null>(null);
 
+  const [isDraggingStock, setIsDraggingStock] = useState(false); // NEW STATE
+
   // OPTIMISTIC UI STATE
   const [optimisticGame, setOptimisticGame] = useState<ClientGameState | null>(null);
   
@@ -324,7 +326,7 @@ function GameBoard({
   }, [game]);
 
   const displayGame = optimisticGame || game;
-
+  const topStockCard = displayGame.deck.length > 0 ? displayGame.deck[displayGame.deck.length - 1] : null;
   const discardRef = useRef<HTMLDivElement>(null);
   const ginRef = useRef<HTMLButtonElement>(null);
 
@@ -373,8 +375,8 @@ function GameBoard({
       }
       next.turnPhase = "discard";
     } else if (action === "draw" && source === "stock") {
-      next.deckCount = Math.max(0, next.deckCount - 1);
-      next.yourHand = [...next.yourHand, "__DRAWING__"]; // Inject placeholder so hand fans out immediately
+      const drawnCard = next.deck.pop(); // Remove actual card from deck
+      next.yourHand = [...next.yourHand, drawnCard || ""]; // Put actual card in hand!
       next.turnPhase = "discard";
     }
 
@@ -570,28 +572,30 @@ function GameBoard({
                 drag={isYourTurn && displayGame.turnPhase === "draw" ? true : false}
                 dragSnapToOrigin
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
+                onDragStart={() => setIsDraggingStock(true)}
                 onDragEnd={(e, info) => {
-                  if (info.offset.y > 60) {
-                    setDropX(info.point.x); // Required for exact drop placement!
-                    sendMove({ action: "draw", source: "stock" });
-                  }
+                  setIsDraggingStock(false);
+                  setDropX(info.point.x); // Remember exactly where they dropped it
+                  sendMove({ action: "draw", source: "stock" }); // ALWAYS draw, no distance check needed!
                 }}
                 disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
                 onClick={() => {
-                  setDropX(null); 
+                  setDropX(null);
                   sendMove({ action: "draw", source: "stock" });
                 }}
                 className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {/* THIS IS THE CRITICAL LINE THAT MAKES IT FLY */}
+                {/* 
+                  When dragging starts, pass the real card ID and tell it to face up. 
+                  We use `layoutId` matching the real card so it connects perfectly to the hand!
+                */}
                 <PlayingCard 
-                  id={null} 
-                  faceDown 
-                  layoutId={isYourTurn && displayGame.turnPhase === "draw" ? "card-__DRAWING__" : undefined} 
+                  id={isDraggingStock ? topStockCard : null} 
+                  faceDown={!isDraggingStock} 
+                  layoutId={isYourTurn && displayGame.turnPhase === "draw" && topStockCard ? `card-${topStockCard}` : undefined} 
                 />
-                
                 <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">
-                  {displayGame.deckCount}
+                  {displayGame.deck.length}
                 </span>
               </motion.button>
             </div>
