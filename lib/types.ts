@@ -135,7 +135,7 @@ export interface ClientOpponentView {
 
 export interface ClientGameState {
   yourSeat: number;
-  deckCount: number;
+  deck: CardId[]; // Changed from deckCount: number
   discardTop: CardId | null;
   discard: CardId[];
   yourHand: CardId[];
