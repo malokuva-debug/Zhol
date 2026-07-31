@@ -546,18 +546,24 @@ function GameBoard({
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
                 onDragEnd={(e, info) => {
                   if (info.offset.y > 60) {
-                    setDropX(info.point.x); // Remember where it was dropped horizontally
+                    setDropX(info.point.x); // Required for exact drop placement!
                     sendMove({ action: "draw", source: "stock" });
                   }
                 }}
                 disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
                 onClick={() => {
-                  setDropX(null); // Clicked instead of dragged, reset placement
+                  setDropX(null); 
                   sendMove({ action: "draw", source: "stock" });
                 }}
                 className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <PlayingCard id={null} faceDown />
+                {/* THIS IS THE CRITICAL LINE THAT MAKES IT FLY */}
+                <PlayingCard 
+                  id={null} 
+                  faceDown 
+                  layoutId={isYourTurn && displayGame.turnPhase === "draw" ? "card-__DRAWING__" : undefined} 
+                />
+                
                 <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">
                   {displayGame.deckCount}
                 </span>
