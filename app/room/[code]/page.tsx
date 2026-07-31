@@ -80,28 +80,57 @@ export default function RoomPage() {
 
   const { room, yourSeat, game } = data;
 
+  function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clientId: string }) {
+  const router = useRouter();
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  
+  const isHost = room.hostClientId === clientId;
+
+  function copy(kind: "code" | "link") {
+    const text = kind === "code" ? room.code : `${window.location.origin}/room/${room.code}`;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(kind);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }
+
+  async function handleDeleteRoom() {
+    if (!confirm("Are you sure you want to completely delete this room? This will kick everyone out.")) return;
+    
+    await fetch(`/api/rooms/${room.code}/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId }),
+    });
+    
+    router.push("/lobby");
+  }
+
   return (
-    <main className="mx-auto min-h-screen max-w-6xl px-4 py-6">
-      <RoomHeader room={room} />
-
-      {room.status === "waiting" && <WaitingRoom room={room} yourSeat={yourSeat} clientId={clientId} code={code} />}
-
-      {room.status !== "waiting" && game && yourSeat !== null && (
-        <GameBoard
-          room={room}
-          game={game}
-          yourSeat={yourSeat}
-          code={code}
-          selectedCard={selectedCard}
-          setSelectedCard={setSelectedCard}
-          actionError={actionError}
-          setActionError={setActionError}
-        />
-      )}
-    </main>
+    <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">{room.name}</div>
+        <h1 className="text-2xl font-black text-glow-purple">Room {room.code}</h1>
+      </div>
+      <div className="flex gap-2">
+        {isHost && (
+          <button 
+            onClick={handleDeleteRoom} 
+            className="glass rounded-lg border-neon-pink/40 px-3 py-2 text-xs font-semibold text-neon-pink hover:bg-neon-pink/10 transition"
+          >
+            Delete Room
+          </button>
+        )}
+        <button onClick={() => copy("code")} className="glass rounded-lg px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10">
+          {copied === "code" ? "Copied!" : "Copy Code"}
+        </button>
+        <button onClick={() => copy("link")} className="glass rounded-lg px-3 py-2 text-xs font-semibold text-white/80 hover:bg-white/10">
+          {copied === "link" ? "Copied!" : "Copy Invite Link"}
+        </button>
+      </div>
+    </header>
   );
 }
-
 function RoomHeader({ room }: { room: Omit<Room, "passwordHash"> }) {
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
