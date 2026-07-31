@@ -278,6 +278,7 @@ function GameBoard({
   const router = useRouter();
   const clientId = getClientId();
   const you = room.seats[yourSeat];
+  const [dropX, setDropX] = useState<number | null>(null);
 
   // OPTIMISTIC UI STATE
   const [optimisticGame, setOptimisticGame] = useState<ClientGameState | null>(null);
@@ -509,10 +510,16 @@ function GameBoard({
                 dragSnapToOrigin
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
                 onDragEnd={(e, info) => {
-                  if (info.offset.y > 60) sendMove({ action: "draw", source: "stock" });
+                  if (info.offset.y > 60) {
+                    setDropX(info.point.x); // Remember where it was dropped horizontally
+                    sendMove({ action: "draw", source: "stock" });
+                  }
                 }}
                 disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
-                onClick={() => sendMove({ action: "draw", source: "stock" })}
+                onClick={() => {
+                  setDropX(null); // Clicked instead of dragged, reset placement
+                  sendMove({ action: "draw", source: "stock" });
+                }}
                 className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <PlayingCard id={null} faceDown />
@@ -529,10 +536,16 @@ function GameBoard({
                 dragSnapToOrigin
                 whileDrag={{ scale: 1.05, zIndex: 50 }}
                 onDragEnd={(e, info) => {
-                  if (info.offset.y > 60) sendMove({ action: "draw", source: "discard" });
+                  if (info.offset.y > 60) {
+                    setDropX(info.point.x); // Remember where it was dropped
+                    sendMove({ action: "draw", source: "discard" });
+                  }
                 }}
                 disabled={!isYourTurn || displayGame.turnPhase !== "draw" || !displayGame.discardTop}
-                onClick={() => sendMove({ action: "draw", source: "discard" })}
+                onClick={() => {
+                  setDropX(null);
+                  sendMove({ action: "draw", source: "discard" });
+                }}
                 className="relative z-10 disabled:cursor-not-allowed"
               >
                 {displayGame.discardTop ? (
@@ -608,6 +621,7 @@ function GameBoard({
           interactive={canAct && !showingScore}
           meldIndexByCard={meldIndexByCard}
           onDragEnd={handleDragEnd}
+          insertAtX={dropX} // Pass the remembered drop location!
         />
       </div>
 
