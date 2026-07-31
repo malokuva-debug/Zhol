@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { getNickname, getClientId } from "@/lib/client-id";
+import { getNickname, getClientId, getRecentRooms } from "@/lib/client-id";
 import { useLiveData } from "@/lib/use-live-data";
 import { lobbyChannel, EVENTS } from "@/lib/pusher";
 import type { RoomSummary } from "@/lib/types";
@@ -23,6 +23,7 @@ export default function LobbyPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [joinTarget, setJoinTarget] = useState<RoomSummary | null>(null);
   const [joinCode, setJoinCode] = useState("");
+  const [recentCodes, setRecentCodes] = useState<string[]>([]);
 
   const { data, loading, refetch } = useLiveData<LobbyResponse>("/api/lobby", lobbyChannel(), EVENTS.LOBBY_UPDATED, 3000);
 
@@ -34,9 +35,11 @@ export default function LobbyPage() {
     }
     setNicknameState(n);
     getClientId();
+    setRecentCodes(getRecentRooms()); // Added fetch
   }, [router]);
 
   const rooms = data?.rooms ?? [];
+  const recentRooms = rooms.filter((r) => recentCodes.includes(r.code));
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-8">
@@ -58,6 +61,30 @@ export default function LobbyPage() {
           </span>
         </div>
       </header>
+
+      {/* Jump Back In Section */}
+      {recentRooms.length > 0 && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neon-blue-soft">Jump Back In</h2>
+          <div className="flex flex-wrap gap-3">
+            {recentRooms.map((r) => (
+              <button
+                key={r.code}
+                onClick={() => router.push(`/room/${r.code}`)}
+                className="glass glow-blue flex items-center gap-4 rounded-xl px-5 py-3 transition hover:scale-[1.02]"
+              >
+                <div className="text-left">
+                  <div className="font-bold text-white">{r.name}</div>
+                  <div className="text-xs text-white/50">Code: {r.code}</div>
+                </div>
+                <span className="rounded-lg bg-neon-blue/20 px-3 py-1 text-xs font-bold text-neon-blue-soft">Rejoin</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mb-6 flex flex-wrap gap-3">
 
       <div className="mb-6 flex flex-wrap gap-3">
         <motion.button
