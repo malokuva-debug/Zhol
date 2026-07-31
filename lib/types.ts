@@ -45,6 +45,40 @@ export interface HouseRules {
   jokerCount: 0 | 2 | 4;
 }
 
+// Inside HouseRules:
+export interface HouseRules {
+  gameMode: GameMode;
+  teamMode?: "1v1" | "2v2"; // <-- ADD THIS
+  ginBonuses: Record<GinType, number>;
+  eliminationScore: number;
+  turnTimerSeconds: number;
+  jokerCount: 0 | 2 | 4;
+}
+
+// Inside SeatState:
+export interface SeatState {
+  nickname: string;
+  clientId: string;
+  connected: boolean;
+  lastSeenAt: number;
+  ready: boolean;
+  hand: CardId[];
+  score: number;
+  eliminated: boolean;
+  team?: 1 | 2; // <-- ADD THIS
+}
+
+// Inside ClientOpponentView:
+export interface ClientOpponentView {
+  seatIdx: number;
+  nickname: string;
+  connected: boolean;
+  cardCount: number;
+  score: number;
+  eliminated: boolean;
+  team?: 1 | 2; // <-- ADD THIS
+}
+
 export const DEFAULT_HOUSE_RULES: HouseRules = {
   gameMode: "zhol", // Defaults to Zhol
   ginBonuses: DEFAULT_GIN_BONUSES,
