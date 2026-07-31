@@ -306,25 +306,28 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 // ----------------------------------------------------------------------
 
 function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwordHash">; game: ClientGameState; yourSeat: number; code: string; }) {
+  // Sync state directly from server on every live update
   const [optimisticBoard, setOptimisticBoard] = useState<Record<number, 1 | 2 | null>>(game.board || {});
   const [selectedFrom, setSelectedFrom] = useState<number | null>(null);
   const [error, setError] = useState("");
 
+  // FORCE SYNC: Whenever 'game' object updates from server (via Pusher/Polling), update the board!
   useEffect(() => {
-    setOptimisticBoard(game.board || {});
+    if (game.board) {
+      setOptimisticBoard(game.board);
+    }
     setSelectedFrom(null);
-  }, [game.board, game.turnIdx]);
+  }, [game.board, game.turnIdx, game.pendingRemoval]);
 
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
+  
+  // Seat 0 = Player 1, Seat 1 = Player 2
   const myPlayerId = yourSeat === 0 ? 1 : 2;
   const enemyPlayerId = myPlayerId === 1 ? 2 : 1;
 
-  // Board Piece Counts
-  const p1BoardCount = Object.values(optimisticBoard).filter((v) => v === 1).length;
-  const p2BoardCount = Object.values(optimisticBoard).filter((v) => v === 2).length;
-
-  const myBoardCount = myPlayerId === 1 ? p1BoardCount : p2BoardCount;
-  const enemyBoardCount = enemyPlayerId === 1 ? p1BoardCount : p2BoardCount;
+  // Exact Board Piece Counts
+  const myBoardCount = Object.values(optimisticBoard).filter((v) => v === myPlayerId).length;
+  const enemyBoardCount = Object.values(optimisticBoard).filter((v) => v === enemyPlayerId).length;
 
   const TOTAL_PIECES = 9;
 
@@ -345,13 +348,14 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     if (!isYourTurn) return;
     setError("");
 
-    // --- REMOVAL MODE ---
+    // --- 1. REMOVAL MODE (3 IN A ROW) ---
     if (isPendingRemoval) {
       if (optimisticBoard[ptIdx] !== enemyPlayerId) {
-        setError("Click an opponent's piece to remove it!");
+        setError("You MUST click an OPPONENT'S piece (pink) to remove it!");
         return;
       }
 
+      // Optimistically clear the enemy piece on your screen immediately
       setOptimisticBoard((prev) => ({ ...prev, [ptIdx]: null }));
 
       const res = await fetch(`/api/rooms/${code}/move`, {
@@ -361,19 +365,20 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       });
 
       if (!res.ok) {
-        setError((await res.json()).error);
-        setOptimisticBoard(game.board || {});
+        const errJson = await res.json();
+        setError(errJson.error || "Could not remove piece.");
+        setOptimisticBoard(game.board || {}); // Revert if rejected
       }
       return;
     }
 
-    // --- PLACEMENT MODE ---
+    // --- 2. PLACEMENT MODE ---
     if (isPlacementPhase) {
       if (myUnplaced === 0) {
-        setError("You have placed all 9 pieces! Waiting for opponent to finish placing.");
+        setError("You placed all 9 pieces! Waiting for opponent to place theirs.");
         return;
       }
-      if (optimisticBoard[ptIdx]) {
+      if (optimisticBoard[ptIdx] !== null) {
         setError("Point is already taken!");
         return;
       }
@@ -387,22 +392,23 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       });
 
       if (!res.ok) {
-        setError((await res.json()).error);
+        const errJson = await res.json();
+        setError(errJson.error || "Placement failed.");
         setOptimisticBoard(game.board || {});
       }
       return;
     }
 
-    // --- MOVEMENT / FLYING MODE ---
+    // --- 3. MOVEMENT / FLYING MODE ---
     if (selectedFrom === null) {
       if (optimisticBoard[ptIdx] === myPlayerId) {
         setSelectedFrom(ptIdx);
       } else {
-        setError("Click one of your pieces on the board to select it.");
+        setError("Click one of your own blue pieces to move it.");
       }
     } else {
       if (optimisticBoard[ptIdx] === myPlayerId) {
-        setSelectedFrom(ptIdx);
+        setSelectedFrom(ptIdx); // Switch selection to another owned piece
         return;
       }
 
@@ -424,13 +430,14 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       });
 
       if (!res.ok) {
-        setError((await res.json()).error);
+        const errJson = await res.json();
+        setError(errJson.error || "Move failed.");
         setOptimisticBoard(game.board || {});
       }
     }
   }
 
-  // Exact coordinates matching the SVG viewbox (10% to 90%)
+  // Exact 24 points (0-23) matching standard Nine Men's Morris grid
   const POINTS = [
     // Outer Square (0-7)
     { x: 10, y: 10 }, { x: 50, y: 10 }, { x: 90, y: 10 },
@@ -449,14 +456,14 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   return (
     <div className="flex flex-col items-center gap-6">
       
-      {/* DETAILED SCORE & PIECE INVENTORY DASHBOARD */}
+      {/* SCORE & INVENTORY TRACKER */}
       <div className="grid w-full max-w-lg grid-cols-2 gap-4">
         
-        {/* ENEMY DASHBOARD */}
+        {/* ENEMY (Always Pink on your screen) */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10 shadow-[0_0_15px_rgba(255,91,200,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-neon-pink shadow-[0_0_8px_#ff5bc8]" />
+              <span className="h-3.5 w-3.5 rounded-full bg-neon-pink shadow-[0_0_8px_#ff5bc8]" />
               <span className="font-bold text-white text-sm">{enemyNickname}</span>
             </div>
             {!isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-pink/20 text-neon-pink px-2 py-0.5 rounded-full animate-pulse">Turn</span>}
@@ -474,7 +481,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
                       ? "bg-neon-pink border-white shadow-[0_0_6px_#ff5bc8]"
                       : isUnplaced
                       ? "bg-neon-pink/40 border-neon-pink/60"
-                      : "bg-black/50 border-white/10 opacity-30"
+                      : "bg-black/50 border-white/10 opacity-20"
                   }`}
                 />
               );
@@ -483,7 +490,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
           <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1 text-white/60">
             <div>
-              <span className="block text-[9px] uppercase tracking-wider text-white/40">Board</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">On Board</span>
               <span className="font-extrabold text-neon-pink text-sm">{enemyBoardCount}</span>
             </div>
             <div>
@@ -497,11 +504,11 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           </div>
         </div>
 
-        {/* YOUR DASHBOARD */}
+        {/* YOU (Always Blue on your screen) */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10 shadow-[0_0_15px_rgba(77,216,255,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-neon-blue shadow-[0_0_8px_#4dd8ff]" />
+              <span className="h-3.5 w-3.5 rounded-full bg-neon-blue shadow-[0_0_8px_#4dd8ff]" />
               <span className="font-bold text-white text-sm">You</span>
             </div>
             {isYourTurn && <span className="text-[10px] uppercase font-extrabold tracking-wider bg-neon-blue/20 text-neon-blue-soft px-2 py-0.5 rounded-full animate-pulse">Your Turn</span>}
@@ -519,7 +526,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
                       ? "bg-neon-blue border-white shadow-[0_0_6px_#4dd8ff]"
                       : isUnplaced
                       ? "bg-neon-blue/40 border-neon-blue/60"
-                      : "bg-black/50 border-white/10 opacity-30"
+                      : "bg-black/50 border-white/10 opacity-20"
                   }`}
                 />
               );
@@ -528,7 +535,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
           <div className="grid grid-cols-3 gap-1 text-center text-[11px] mt-1 text-white/60">
             <div>
-              <span className="block text-[9px] uppercase tracking-wider text-white/40">Board</span>
+              <span className="block text-[9px] uppercase tracking-wider text-white/40">On Board</span>
               <span className="font-extrabold text-neon-blue-soft text-sm">{myBoardCount}</span>
             </div>
             <div>
@@ -544,20 +551,20 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
       </div>
 
-      {/* GAME PHASE INSTRUCTION BANNER */}
+      {/* GAME STATUS INSTRUCTION BANNER */}
       <div className="text-center min-h-[40px] flex items-center justify-center">
         {isYourTurn ? (
           isPendingRemoval ? (
             <span className="animate-pulse-glow rounded-full bg-neon-pink/20 px-5 py-1.5 text-neon-pink font-extrabold text-sm border border-neon-pink/40 shadow-lg">
-              💥 3-IN-A-ROW! Click an opponent's piece to remove it!
+              💥 3-IN-A-ROW! Click a PINK enemy piece to destroy it!
             </span>
           ) : isPlacementPhase ? (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/15 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/30">
-              Placement Phase — Click an empty point to place ({myUnplaced} in reserve)
+              Placement Phase — Click an empty point ({myUnplaced} left)
             </span>
           ) : isFlying ? (
             <span className="animate-pulse-glow rounded-full bg-neon-purple/20 px-5 py-1.5 text-neon-purple-soft font-extrabold text-sm border border-neon-purple/40">
-              🦅 FLYING PHASE! Click any piece, then click ANY open point!
+              🦅 FLYING PHASE! Click your piece, then click ANY open spot!
             </span>
           ) : selectedFrom !== null ? (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/20 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/40">
@@ -565,7 +572,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
             </span>
           ) : (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/15 px-5 py-1.5 text-neon-blue-soft font-bold text-sm border border-neon-blue/30">
-              Movement Phase — Click one of your pieces to select it
+              Movement Phase — Click one of your blue pieces to select it
             </span>
           )
         ) : (
@@ -575,28 +582,25 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
       {error && <p className="text-neon-pink text-sm font-bold bg-neon-pink/10 px-4 py-1 rounded-lg border border-neon-pink/30">{error}</p>}
 
-      {/* THE BOARD WITH PRECISION ALIGNED INTERSECTIONS */}
+      {/* THE BOARD */}
       <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple overflow-hidden">
         
-        {/* SVG BOARD LINES */}
+        {/* BOARD LINES */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
-          {/* Outer Square */}
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
-          {/* Middle Square */}
           <rect x="25%" y="25%" width="50%" height="50%" fill="none" />
-          {/* Inner Square */}
           <rect x="40%" y="40%" width="20%" height="20%" fill="none" />
-          {/* Connecting Cross Lines */}
           <line x1="50%" y1="10%" x2="50%" y2="40%" />
           <line x1="50%" y1="60%" x2="50%" y2="90%" />
           <line x1="10%" y1="50%" x2="40%" y2="50%" />
           <line x1="60%" y1="50%" x2="90%" y2="50%" />
         </svg>
 
-        {/* 24 EXACT INTERSECTION BUTTONS */}
+        {/* 24 INTERSECTION POINTS */}
         {POINTS.map((pt, i) => {
           const owner = optimisticBoard[i];
-          const isPlayer1 = owner === 1;
+          const isMyPiece = owner === myPlayerId;
+          const isEnemyPiece = owner === enemyPlayerId;
           const isSelected = selectedFrom === i;
 
           return (
@@ -606,17 +610,17 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
               className={`absolute flex items-center justify-center transition-all duration-150 transform -translate-x-1/2 -translate-y-1/2 rounded-full border-2 cursor-pointer
                 ${isSelected ? "ring-4 ring-yellow-400 scale-125 z-30 shadow-[0_0_15px_#facc15]" : ""}
                 ${
-                  owner
-                    ? isPlayer1
-                      ? "w-8 h-8 sm:w-10 sm:h-10 bg-neon-blue border-white z-20 shadow-[0_0_12px_#4dd8ff]"
-                      : "w-8 h-8 sm:w-10 sm:h-10 bg-neon-pink border-white z-20 shadow-[0_0_12px_#ff5bc8]"
+                  isMyPiece
+                    ? "w-8 h-8 sm:w-10 sm:h-10 bg-neon-blue border-white z-20 shadow-[0_0_12px_#4dd8ff]"
+                    : isEnemyPiece
+                    ? "w-8 h-8 sm:w-10 sm:h-10 bg-neon-pink border-white z-20 shadow-[0_0_12px_#ff5bc8]"
                     : "w-6 h-6 sm:w-8 sm:h-8 bg-[#181335] border-white/30 hover:border-white hover:bg-white/20 z-10"
                 }
               `}
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
               onClick={() => handlePointClick(i)}
             >
-              {/* Visible dot indicator for empty spots */}
+              {/* Subtle dot for empty points */}
               {!owner && <span className="w-2 h-2 rounded-full bg-white/40" />}
             </button>
           );
