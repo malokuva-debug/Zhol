@@ -1,0 +1,250 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getRoom, saveRoom } from "@/lib/store";
+import { applyDraw, applyDiscard, applyGin } from "@/lib/room-logic";
+import { formsMill, hasNonMillPieces, hasLegalMoves, CICMIC_ADJACENCY } from "@/lib/cicmic-engine";
+import { checkPishpirikCapture, scorePishpirikCards } from "@/lib/pishpirik-engine";
+import { publishRoomUpdate } from "@/lib/pusher";
+
+const Schema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("draw"), clientId: z.string(), source: z.enum(["stock", "discard"]) }),
+  z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
+  z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
+  z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
+  z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
+  z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
+  z.object({ action: z.literal("cicmic_remove"), clientId: z.string(), point: z.number() }),
+]);
+
+export async function POST(req: Request, { params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  const body = await req.json().catch(() => null);
+  const parsed = Schema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request payload." }, { status: 400 });
+  }
+
+  const room = await getRoom(code.toUpperCase());
+  if (!room || room.status !== "playing" || !room.game) {
+    return NextResponse.json({ error: "Room not active or match finished." }, { status: 404 });
+  }
+
+  const seatIdx = room.seats.findIndex((s) => s?.clientId === parsed.data.clientId);
+  if (seatIdx === -1) {
+    return NextResponse.json({ error: "Player not seated in this room." }, { status: 403 });
+  }
+
+  if (room.game.turnIdx !== seatIdx) {
+    return NextResponse.json({ error: "Not your turn!" }, { status: 400 });
+  }
+
+  let result: { ok?: boolean; error?: string } = { error: "Action could not be executed." };
+
+  switch (parsed.data.action) {
+    // --- ZHOL ---
+    case "draw":
+      result = applyDraw(room, seatIdx, parsed.data.source);
+      break;
+    case "discard":
+      result = applyDiscard(room, seatIdx, parsed.data.cardId);
+      break;
+    case "gin":
+      result = applyGin(room, seatIdx, parsed.data.cardId);
+      break;
+
+    // --- PISHPIRIK ---
+    case "pishpirik_play": {
+      const cardId = parsed.data.cardId;
+      const seat = room.seats[seatIdx];
+
+      if (!seat || !seat.hand.includes(cardId)) {
+        result = { error: "Card not in hand." };
+        break;
+      }
+
+      seat.hand = seat.hand.filter((c) => c !== cardId);
+
+      const tablePile = room.game.tablePile || [];
+      const { captures, isPishpirik } = checkPishpirikCapture(cardId, tablePile);
+
+      if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
+      if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
+
+      if (captures) {
+        const eaten = [...tablePile, cardId];
+        room.game.capturedBySeat[seatIdx] = [...(room.game.capturedBySeat[seatIdx] || []), ...eaten];
+        room.game.tablePile = [];
+        room.game.lastCaptureIdx = seatIdx;
+
+        if (isPishpirik) {
+          room.game.pishpiriksBySeat[seatIdx] = (room.game.pishpiriksBySeat[seatIdx] || 0) + 1;
+        }
+      } else {
+        room.game.tablePile = [...tablePile, cardId];
+      }
+
+      const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
+      const allHandsEmpty = activeSeats.every((i) => (room.seats[i]?.hand.length || 0) === 0);
+
+      if (allHandsEmpty) {
+        if (room.game.deck.length >= activeSeats.length * 4) {
+          for (const i of activeSeats) {
+            room.seats[i]!.hand = room.game.deck.splice(0, 4);
+          }
+        } else {
+          if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
+            const remaining = room.game.tablePile;
+            room.game.capturedBySeat[room.game.lastCaptureIdx] = [
+              ...(room.game.capturedBySeat[room.game.lastCaptureIdx] || []),
+              ...remaining,
+            ];
+            room.game.tablePile = [];
+          }
+
+          for (const i of activeSeats) {
+            const captured = room.game.capturedBySeat[i] || [];
+            const rawPts = scorePishpirikCards(captured);
+            const pishCount = room.game.pishpiriksBySeat[i] || 0;
+            room.seats[i]!.score += rawPts + pishCount * 10;
+          }
+
+          room.game.turnPhase = "round_over";
+          room.game.matchOver = true;
+        }
+      }
+
+      let nextTurn = activeSeats.findIndex((i) => i === seatIdx) + 1;
+      if (nextTurn >= activeSeats.length) nextTurn = 0;
+      room.game.turnIdx = activeSeats[nextTurn];
+      room.game.turnStartedAt = Date.now();
+
+      result = { ok: true };
+      break;
+    }
+
+    // --- CICMIC ---
+    case "cicmic_place": {
+      const board = room.game.board || {};
+      const pt = parsed.data.point;
+      const playerNum = seatIdx === 0 ? 1 : 2;
+
+      if (board[pt] !== null && board[pt] !== undefined) {
+        result = { error: "Point is already occupied!" };
+        break;
+      }
+
+      board[pt] = playerNum as 1 | 2;
+
+      if (formsMill(board, pt, playerNum as 1 | 2)) {
+        room.game.pendingRemoval = true;
+      } else {
+        const enemySeatIdx = room.seats.findIndex((_, i) => i !== seatIdx);
+        room.game.turnIdx = enemySeatIdx;
+      }
+
+      room.game.board = board;
+      room.game.turnStartedAt = Date.now();
+      result = { ok: true };
+      break;
+    }
+
+    case "cicmic_move": {
+      const board = room.game.board || {};
+      const { from, to } = parsed.data;
+      const playerNum = seatIdx === 0 ? 1 : 2;
+      const enemyNum = playerNum === 1 ? 2 : 1;
+
+      if (board[from] !== playerNum || board[to] !== null) {
+        result = { error: "Invalid move origin or occupied destination." };
+        break;
+      }
+
+      const playerPieceCount = Object.values(board).filter((v) => v === playerNum).length;
+      const isFlying = playerPieceCount === 3;
+      const isAdjacent = CICMIC_ADJACENCY[from]?.includes(to);
+
+      if (!isAdjacent && !isFlying) {
+        result = { error: "Piece can only slide to adjacent connected points!" };
+        break;
+      }
+
+      board[from] = null;
+      board[to] = playerNum as 1 | 2;
+
+      const enemySeatIdx = room.seats.findIndex((_, i) => i !== seatIdx);
+
+      if (formsMill(board, to, playerNum as 1 | 2)) {
+        room.game.pendingRemoval = true;
+      } else {
+        const enemyPieceCount = Object.values(board).filter((v) => v === enemyNum).length;
+        const enemyIsFlying = enemyPieceCount === 3;
+
+        if (!hasLegalMoves(board, enemyNum as 1 | 2, enemyIsFlying)) {
+          room.game.matchOver = true;
+          room.game.matchWinnerIdx = seatIdx;
+        } else {
+          room.game.turnIdx = enemySeatIdx;
+        }
+      }
+
+      room.game.board = board;
+      room.game.turnStartedAt = Date.now();
+      result = { ok: true };
+      break;
+    }
+
+    case "cicmic_remove": {
+      const board = room.game.board || {};
+      if (!room.game.pendingRemoval) {
+        result = { error: "No active removal allowed." };
+        break;
+      }
+
+      const pt = parsed.data.point;
+      const playerNum = seatIdx === 0 ? 1 : 2;
+      const enemyNum = playerNum === 1 ? 2 : 1;
+      const enemySeatIdx = room.seats.findIndex((_, i) => i !== seatIdx);
+
+      if (board[pt] !== enemyNum) {
+        result = { error: "Target point does not contain an enemy piece!" };
+        break;
+      }
+
+      const inMill = formsMill(board, pt, enemyNum as 1 | 2);
+      const freePieces = hasNonMillPieces(board, enemyNum as 1 | 2);
+
+      if (inMill && freePieces) {
+        result = { error: "Cannot destroy a piece in a Mill unless no other pieces exist!" };
+        break;
+      }
+
+      board[pt] = null;
+      room.game.pendingRemoval = false;
+
+      const enemyPiecesRemaining = Object.values(board).filter((v) => v === enemyNum).length;
+      const totalPlacementsMade = Object.values(board).filter((v) => v !== null).length;
+
+      if (enemyPiecesRemaining < 3 && totalPlacementsMade >= 18) {
+        room.game.matchOver = true;
+        room.game.matchWinnerIdx = seatIdx;
+      } else {
+        room.game.turnIdx = enemySeatIdx;
+      }
+
+      room.game.board = board;
+      room.game.turnStartedAt = Date.now();
+      result = { ok: true };
+      break;
+    }
+  }
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  await saveRoom(room);
+  await publishRoomUpdate(room.code);
+
+  return NextResponse.json({ ok: true });
+}
