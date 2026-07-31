@@ -32,7 +32,8 @@ export default function PlayingCard({
 }) {
   const dims = small ? "h-16 w-11 text-[10px]" : "h-24 w-16 text-sm sm:h-28 sm:w-[4.5rem] sm:text-base";
 
-  if (faceDown || !id) {
+  // Handle nulls and our optimistic drawing placeholder
+  if (faceDown || !id || id === "__DRAWING__") {
     return (
       <motion.div
         layoutId={layoutId}
@@ -57,7 +58,7 @@ export default function PlayingCard({
           selected ? "border-white ring-2 ring-white/80" : "border-black/10"
         } ${onClick ? "cursor-pointer" : "cursor-default"}`}
       >
-        <span className="text-xl leading-none sm:text-2xl">🃏</span>
+        <span className="text-xl leading-none sm:text-2xl">★</span>
         <span className="mt-1 font-black uppercase leading-none text-white/90">Joker</span>
       </motion.button>
     );
