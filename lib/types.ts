@@ -47,12 +47,12 @@ export interface HouseRules {
 
 // Inside HouseRules:
 export interface HouseRules {
-  gameMode: GameMode;
-  teamMode?: "1v1" | "2v2"; // <-- ADD THIS
-  ginBonuses: Record<GinType, number>;
+  gameMode: "zhol" | "pishpirik" | "cicmic";
+  teamMode?: "1v1" | "2v2" | "free";
+  ginBonuses: { gin: number; bigGin: number; superGin: number };
   eliminationScore: number;
   turnTimerSeconds: number;
-  jokerCount: 0 | 2 | 4;
+  jokerCount: number;
 }
 
 // Inside SeatState:
