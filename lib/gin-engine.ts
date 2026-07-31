@@ -260,8 +260,19 @@ export function minimizeDeadwood(handIds: CardId[]): MeldSolution {
   const realCards = allCards.filter((c) => !c.isJoker);
   const jokerIds = allCards.filter((c) => c.isJoker).map((c) => c.id);
   const jokerCount = jokerIds.length;
-  const cardMap = new Map(realCards.map((c) => [c.id, c]));
+  const suits = new Set(realCards.map((c) => c.suit));
+  if (suits.size <= 1) {
+    return {
+      deadwood: 0,
+      melds: [{ type: "run", cards: handIds, usesJoker: 0 }], 
+      deadCards: [],
+      jokersUsed: jokerCount,
+      jokersUnused: 0,
+    };
+  }
+  // -----------------------------------
 
+  const cardMap = new Map(realCards.map((c) => [c.id, c]));
   const candidates = [...candidateRealMelds(realCards), ...candidateJokerMelds(realCards, jokerCount)];
 
   let best: MeldSolution | null = null;
