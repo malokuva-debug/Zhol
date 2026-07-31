@@ -35,7 +35,7 @@ export default function LobbyPage() {
     }
     setNicknameState(n);
     getClientId();
-    setRecentCodes(getRecentRooms()); // Added fetch
+    setRecentCodes(getRecentRooms());
   }, [router]);
 
   const rooms = data?.rooms ?? [];
@@ -85,8 +85,6 @@ export default function LobbyPage() {
       )}
 
       <div className="mb-6 flex flex-wrap gap-3">
-
-      <div className="mb-6 flex flex-wrap gap-3">
         <motion.button
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
@@ -105,7 +103,7 @@ export default function LobbyPage() {
           onClick={() => refetch()}
           className="glass ml-auto rounded-xl px-5 py-2.5 font-semibold text-white/70 transition hover:bg-white/10"
         >
-          ↻ Refresh
+          Refresh
         </button>
       </div>
 
@@ -119,8 +117,9 @@ export default function LobbyPage() {
         </div>
 
         {loading && rooms.length === 0 && (
-          <div className="px-5 py-10 text-center text-white/40">Loading tables…</div>
+          <div className="px-5 py-10 text-center text-white/40">Loading tables...</div>
         )}
+
         {!loading && rooms.length === 0 && (
           <div className="px-5 py-10 text-center text-white/40">
             No active rooms. Be the first to create one!
@@ -142,12 +141,12 @@ export default function LobbyPage() {
                   {room.name} {room.visibility === "private" && <span className="ml-1 text-xs text-neon-purple-soft">🔒</span>}
                 </div>
                 <div className="text-xs text-white/40">
-                  Host: {room.hostNickname} · Code {room.code}
+                  Host: {room.hostNickname} • Code {room.code}
                 </div>
               </div>
               <div className="font-mono text-white/70">{room.playerCount}/{room.maxPlayers}</div>
               <div className="text-xs text-white/50">
-                Out at {room.rules.eliminationScore} · {room.rules.turnTimerSeconds ? `${room.rules.turnTimerSeconds}s timer` : "No timer"}
+                Out at {room.rules.eliminationScore} • {room.rules.turnTimerSeconds ? `${room.rules.turnTimerSeconds}s timer` : "No timer"}
               </div>
               <StatusBadge status={room.status} />
               <button
@@ -163,6 +162,7 @@ export default function LobbyPage() {
       </div>
 
       {showCreate && <CreateRoomModal nickname={nickname} onClose={() => setShowCreate(false)} />}
+      
       {joinTarget && (
         <JoinRoomModal
           room={"code" in joinTarget ? (joinTarget as RoomSummary) : null}
