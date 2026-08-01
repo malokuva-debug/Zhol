@@ -1,0 +1,25 @@
+// Optional: only used for persisted match history. If DATABASE_URL is unset,
+// the app runs fine without it — live gameplay never depends on Postgres.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model MatchHistory {
+  id           String   @id @default(cuid())
+  roomCode     String
+  roomName     String
+  playersJson  String   // JSON array of { nickname, score, eliminated }
+  winner       String
+  roundsPlayed Int
+  playerCount  Int
+  startedAt    DateTime
+  finishedAt   DateTime @default(now())
+
+  @@index([finishedAt])
+}
