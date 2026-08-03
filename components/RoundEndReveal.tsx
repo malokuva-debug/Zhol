@@ -8,6 +8,7 @@ import { makeCard } from "@/lib/gin-engine";
 interface Props {
   gameState: ClientGameState;
   onNextRound: () => void;
+  onLeave: () => void;
 }
 
 // 🃏 Helper to visually render the actual deadwood cards
@@ -115,7 +116,7 @@ function DeadwoodRow({
   );
 }
 
-export default function RoundEndReveal({ gameState, onNextRound }: Props) {
+export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Props) {
   // 'smash' plays the impact animation, 'counting' shows the deadwood tally
   const [phase, setPhase] = useState<"smash" | "counting">("smash");
   const [showButton, setShowButton] = useState(false);
@@ -236,9 +237,13 @@ export default function RoundEndReveal({ gameState, onNextRound }: Props) {
                 Start Next Round
               </button>
             ) : (
-              <div className="w-full py-3.5 bg-emerald-600 text-white font-bold text-lg rounded-xl shadow-[0_0_15px_rgba(5,150,105,0.5)]">
-                Match Finished!
-              </div>
+              <button 
+                onClick={onLeave}
+                disabled={!showButton}
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(5,150,105,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Match Finished - Return to Lobby
+              </button>
             )}
           </motion.div>
         </motion.div>
