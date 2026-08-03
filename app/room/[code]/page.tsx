@@ -845,8 +845,11 @@ function GameBoard({
     if (prevRoundRef.current === null || displayGame.roundNumber !== prevRoundRef.current) {
       const isFirstLoad = prevRoundRef.current === null;
       prevRoundRef.current = displayGame.roundNumber;
+      
       const activeSeatIndices = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
-      const starterSeat = activeSeatIndices.length > 0 ? activeSeatIndices[displayGame.roundNumber % activeSeatIndices.length] : yourSeat;
+      
+      // Use the explicitly tracked dealerIdx from the server to guarantee perfect clockwise shifts!
+      const starterSeat = displayGame.dealerIdx ?? (activeSeatIndices.length > 0 ? activeSeatIndices[0] : yourSeat);
 
       const targets: DealTarget[] = [
         { seatIdx: yourSeat, nickname: you?.nickname ?? "You", isYou: true, finalCount: yourSeat === starterSeat ? 11 : 10 },
