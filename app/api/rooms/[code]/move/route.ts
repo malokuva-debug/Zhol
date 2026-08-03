@@ -11,7 +11,8 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
-  z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }), 
+  z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
+  z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }), // <-- Added Chat action
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
   z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
@@ -37,7 +38,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ error: "Player not seated in this room." }, { status: 403 });
   }
 
-  // Next round triggers from the UI button after counting deadwood finishes
+  // --- ACTIONS THAT CAN BE DONE ANYTIME ---
+  
   if (parsed.data.action === "next_round") {
     if (room.game.turnPhase === "round_over" && !room.game.matchOver) {
       startNextRound(room);
@@ -47,16 +49,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ ok: true });
   }
 
-  // Cheat code is open to anyone at any time
   if (parsed.data.action === "cheat_set_hand") {
     const seat = room.seats[seatIdx];
-    if (seat) {
-      seat.hand = parsed.data.newHand;
+    if (seat) seat.hand = parsed.data.newHand;
+    await saveRoom(room);
+    await publishRoomUpdate(room.code);
+    return NextResponse.json({ ok: true });
+  }
+
+  if (parsed.data.action === "chat") {
+    const seat = room.seats[seatIdx];
+    if (seat && parsed.data.text.trim().length > 0) {
+      room.chat.push({
+        id: Math.random().toString(36).substring(2, 9),
+        kind: "chat",
+        nickname: seat.nickname,
+        text: parsed.data.text.slice(0, 150).trim(),
+        at: Date.now()
+      });
+      if (room.chat.length > 50) room.chat.shift(); // Keep last 50 messages
     }
     await saveRoom(room);
     await publishRoomUpdate(room.code);
     return NextResponse.json({ ok: true });
   }
+
+  // --- GAMEPLAY MOVES (Requires it to be your turn) ---
 
   if (room.game.turnIdx !== seatIdx) {
     return NextResponse.json({ error: "Not your turn!" }, { status: 400 });
