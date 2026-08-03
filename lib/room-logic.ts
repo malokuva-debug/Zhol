@@ -51,7 +51,7 @@ export function newRoom(opts: {
       teamMode: opts.rules.teamMode,
       ginBonuses: { gin: 25, bigGin: 50, superGin: 100 },
       eliminationScore: isFreePlay ? 0 : opts.rules.eliminationScore,
-      turnTimerSeconds: 0, // Turn timer disabled
+      turnTimerSeconds: 0,
       jokerCount: 2,
       allowEliminations: !isFreePlay,
     },
@@ -81,7 +81,6 @@ export function tryJoinRoom(
     }
   }
 
-  // Check if player is reconnecting to an existing seat
   const existingIdx = room.seats.findIndex((s) => s?.clientId === clientId);
   if (existingIdx !== -1) {
     const seat = room.seats[existingIdx]!;
@@ -166,7 +165,7 @@ export function initializeGame(room: Room) {
       turnIdx: 0,
       turnPhase: "discard",
       turnStartedAt: Date.now(),
-      turnTimerSeconds: room.rules.turnTimerSeconds,
+      turnTimerSeconds: room.rules.turnTimerSeconds || 0,
       deck: [],
       discard: [],
       discardTop: null,
@@ -188,9 +187,7 @@ export function initializeGame(room: Room) {
     const dealerIdx = activeSeatIndices[Math.floor(Math.random() * activeSeatIndices.length)];
 
     room.seats.forEach((seat) => {
-      if (seat) {
-        seat.hand = deck.splice(0, 4);
-      }
+      if (seat) seat.hand = deck.splice(0, 4);
     });
 
     room.game = {
@@ -198,7 +195,7 @@ export function initializeGame(room: Room) {
       turnIdx: dealerIdx,
       turnPhase: "discard",
       turnStartedAt: Date.now(),
-      turnTimerSeconds: room.rules.turnTimerSeconds,
+      turnTimerSeconds: room.rules.turnTimerSeconds || 0,
       deck,
       discard: [],
       discardTop: null,
@@ -228,7 +225,7 @@ export function initializeGame(room: Room) {
   room.game = {
     roundNumber: 1,
     turnIdx: starterSeat,
-    turnPhase: "discard", // Starter gets 11 cards, must discard first
+    turnPhase: "discard",
     turnStartedAt: Date.now(),
     turnTimerSeconds: 0,
     deck,
@@ -272,7 +269,7 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
     turnIdx: room.game.turnIdx,
     turnPhase: room.game.turnPhase,
     turnStartedAt: room.game.turnStartedAt,
-    turnTimerSeconds: room.rules.turnTimerSeconds,
+    turnTimerSeconds: room.rules.turnTimerSeconds || 0,
     deck: room.game.deck,
     discard: room.game.discard,
     discardTop: room.game.discardTop,
@@ -366,7 +363,6 @@ export function startNextRound(room: Room) {
     const deck = generateZholDeck(activeSeats.length);
     shuffle(deck);
 
-    // Rotate starter seat clockwise among remaining active players
     let nextStarter = activeSeats.indexOf(room.game.turnIdx) + 1;
     if (nextStarter >= activeSeats.length || nextStarter === -1) nextStarter = 0;
     const starterSeat = activeSeats[nextStarter];
@@ -379,11 +375,11 @@ export function startNextRound(room: Room) {
     const topDiscard = deck.pop() || null;
 
     room.game = {
+      ...room.game,
       roundNumber: room.game.roundNumber + 1,
       turnIdx: starterSeat,
-      turnPhase: "discard", // Starter gets 11 cards, must discard first
+      turnPhase: "discard", 
       turnStartedAt: Date.now(),
-      turnTimerSeconds: 0,
       deck,
       discard: topDiscard ? [topDiscard] : [],
       discardTop: topDiscard,
@@ -397,20 +393,16 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const winnerSeat = room.seats[seatIdx];
   if (!winnerSeat) return { error: "No seat." };
 
-  // Remove the discarded card from hand
   const idx = winnerSeat.hand.indexOf(cardId);
   if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
-  // --- 1. DETERMINE ZHOL BONUS TYPE ---
   const isJokerDiscard = isJokerId(cardId);
-  
-  // Are all remaining 10 cards the same suit? (Jokers act as wild and adapt)
   const handCards = winnerSeat.hand.map(makeCard);
   const nonJokers = handCards.filter(c => !c.isJoker);
   const firstSuit = nonJokers.length > 0 ? nonJokers[0].suit : null;
   const isSuitGin = nonJokers.length > 0 && nonJokers.every(c => c.suit === firstSuit);
 
-  let winBonus = 10; // Default Zhol Bonus
+  let winBonus = 10;
   let ginType: GinType = "normal_gin";
 
   if (isSuitGin && isJokerDiscard) {
@@ -424,7 +416,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     ginType = "joker_gin";
   }
 
-  // --- 2. CALCULATE DEADWOOD & UPDATE SCORES ---
   const pointsBySeat: any[] = [];
 
   room.seats.forEach((seat, i) => {
@@ -434,15 +425,14 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     let deadCards: string[] = [];
 
     if (i === seatIdx) {
-      seat.score -= winBonus; // Winner subtracts bonus points
+      seat.score -= winBonus;
     } else {
       const res = minimizeDeadwood(seat.hand);
       deadwood = res.deadwood;
       deadCards = res.deadCards;
-      seat.score += deadwood; // Non-winners add deadwood
+      seat.score += deadwood;
     }
 
-    // Eliminate player if score exceeds threshold in Classic mode
     if (room.rules.allowEliminations && seat.score >= room.rules.eliminationScore) {
       seat.eliminated = true;
       addSystemMessage(room, `${seat.nickname} has been eliminated!`);
@@ -456,7 +446,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     });
   });
 
-  // --- 3. POPULATE ROUND REVEAL DATA ---
   const winnerRes = minimizeDeadwood(winnerSeat.hand);
   room.game.lastRoundEnd = {
     type: ginType,
@@ -466,10 +455,9 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     pointsBySeat
   };
 
-  // Pause the game on "round_over" so the animation and counting can play
+  // Pause on round_over to let the client play animations and wait for button click!
   room.game.turnPhase = "round_over";
 
-  // --- 4. CHECK MATCH OVER CONDITION ---
   const remainingSeats = room.seats
     .map((s, i) => (s && !s.eliminated ? i : -1))
     .filter((i) => i !== -1);
@@ -478,12 +466,12 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     const finalWinnerIdx = remainingSeats.length === 1 ? remainingSeats[0] : seatIdx;
     room.game.matchOver = true;
     room.game.matchWinnerIdx = finalWinnerIdx;
-    room.status = "finished";
+    room.status = "finished"; // Set room to finished if match is over
     
     const finalWinner = room.seats[finalWinnerIdx];
     addSystemMessage(room, `Match over! ${finalWinner?.nickname || winnerSeat.nickname} wins!`);
   } else {
-    addSystemMessage(room, `${winnerSeat.nickname} declared Zhol! (-${winBonus} pts)`);
+    addSystemMessage(room, `${winnerSeat.nickname} declared Zhol! Waiting for next round...`);
   }
 
   return { ok: true };
