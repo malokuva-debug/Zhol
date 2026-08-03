@@ -1,4 +1,3 @@
-// app/api/rooms/[code]/move/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoom, saveRoom } from "@/lib/store";
@@ -12,7 +11,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
-  z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
+  z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }), 
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
   z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
@@ -38,13 +37,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ error: "Player not seated in this room." }, { status: 403 });
   }
 
+  // Next round triggers from the UI button after counting deadwood finishes
   if (parsed.data.action === "next_round") {
-    startNextRound(room);
-    await saveRoom(room);
-    await publishRoomUpdate(room.code);
+    if (room.game.turnPhase === "round_over" && !room.game.matchOver) {
+      startNextRound(room);
+      await saveRoom(room);
+      await publishRoomUpdate(room.code);
+    }
     return NextResponse.json({ ok: true });
   }
 
+  // Cheat code is open to anyone at any time
   if (parsed.data.action === "cheat_set_hand") {
     const seat = room.seats[seatIdx];
     if (seat) {
