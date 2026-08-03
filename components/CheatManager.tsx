@@ -1,4 +1,3 @@
-// components/CheatManager.tsx
 "use client";
 
 import { useState } from "react";
@@ -15,30 +14,41 @@ interface Props {
 export default function CheatManager({ roomCode, clientId, gameState, onClose }: Props) {
   const [busy, setBusy] = useState(false);
 
+  // If it's your turn, you need 11 cards to discard one. If not, 10.
   const isMyTurn = gameState.turnIdx === gameState.yourSeat;
   const targetLength = isMyTurn ? 11 : 10;
-  
-  const extraCard = "2C"; 
 
+  // We explicitly define the 11th card so you can discard exactly what is needed
+  // to trigger the specific Zhol bonus.
   const CHEAT_HANDS = [
     {
-      label: "Normal Zhol (4x10, 3xJ, 3xQ)",
-      cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "QC"]
+      label: "Normal Zhol (-10 pts)",
+      cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "QC"],
+      extraCard: "2C" // Discarding a regular card
     },
     {
-      label: "Suit Zhol (Hearts Run)",
-      cards: ["AH", "2H", "3H", "4H", "5H", "6H", "7H", "8H", "9H", "10H"]
+      label: "Joker Zhol (-20 pts)",
+      cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "QC"],
+      extraCard: "JK1" // Discarding a Joker
     },
     {
-      label: "Suit + Joker Zhol! (50pts)",
-      cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "JK1", "JK2"]
+      label: "Suit Zhol (-25 pts)",
+      cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "10S"],
+      extraCard: "2C" // Discarding a regular card, leaving all Spades
+    },
+    {
+      label: "Suit + Joker Zhol! (-50 pts)",
+      cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "10S"],
+      extraCard: "JK1" // Discarding a Joker, leaving all Spades
     }
   ];
 
-  async function applyCheat(baseCards: string[]) {
+  async function applyCheat(cheat: typeof CHEAT_HANDS[0]) {
     setBusy(true);
-    const newHand = [...baseCards];
-    if (targetLength === 11) newHand.push(extraCard);
+    const newHand = [...cheat.cards];
+    
+    // Append the specific extra card needed to pull off this Zhol
+    if (targetLength === 11) newHand.push(cheat.extraCard);
 
     try {
       await fetch(`/api/rooms/${roomCode}/move`, {
@@ -71,7 +81,7 @@ export default function CheatManager({ roomCode, clientId, gameState, onClose }:
         </div>
         
         <p className="text-sm text-slate-300 mb-6 font-medium">
-          Select an instant-win hand. Your current hand will be completely replaced.
+          Select an instant-win hand. Once applied, drag the 11th card to the discard pile.
         </p>
 
         <div className="space-y-3">
@@ -79,7 +89,7 @@ export default function CheatManager({ roomCode, clientId, gameState, onClose }:
             <button
               key={i}
               disabled={busy}
-              onClick={() => applyCheat(cheat.cards)}
+              onClick={() => applyCheat(cheat)}
               className="w-full py-3 px-4 bg-slate-800 hover:bg-neon-pink/20 border border-slate-700 hover:border-neon-pink text-white font-bold rounded-xl transition text-left flex justify-between items-center"
             >
               <span>{cheat.label}</span>
