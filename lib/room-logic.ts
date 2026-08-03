@@ -232,6 +232,7 @@ export function initializeGame(room: Room) {
     discard: topDiscard ? [topDiscard] : [],
     discardTop: topDiscard,
     matchOver: false,
+    dealerIdx: starterSeat, // Track who started to rotate properly next round
   };
 }
 
@@ -363,9 +364,17 @@ export function startNextRound(room: Room) {
     const deck = generateZholDeck(activeSeats.length);
     shuffle(deck);
 
-    let nextStarter = activeSeats.indexOf(room.game.turnIdx) + 1;
-    if (nextStarter >= activeSeats.length || nextStarter === -1) nextStarter = 0;
-    const starterSeat = activeSeats[nextStarter];
+    // Securely rotate starter clockwise from whoever started last round!
+    let starterSeat = activeSeats[0];
+    const prevStarter = room.game.dealerIdx ?? activeSeats[0];
+    
+    for (let i = 1; i <= room.seats.length; i++) {
+      const candidate = (prevStarter + i) % room.seats.length;
+      if (activeSeats.includes(candidate)) {
+        starterSeat = candidate;
+        break;
+      }
+    }
 
     activeSeats.forEach((seatIdx) => {
       const count = seatIdx === starterSeat ? 11 : 10;
@@ -384,6 +393,7 @@ export function startNextRound(room: Room) {
       discard: topDiscard ? [topDiscard] : [],
       discardTop: topDiscard,
       matchOver: false,
+      dealerIdx: starterSeat, // Track it for the next rotation
     };
   }
 }
@@ -393,12 +403,10 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const winnerSeat = room.seats[seatIdx];
   if (!winnerSeat) return { error: "No seat." };
 
-  // Remove the discarded card from hand
   const idx = winnerSeat.hand.indexOf(cardId);
   if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
-  // --- 1. DETERMINE ZHOL BONUS TYPE ---
-  // The 10 remaining cards determine if you USED a Joker in your melds!
+  const isJokerDiscard = isJokerId(cardId);
   const handCards = winnerSeat.hand.map(makeCard);
   const hasJoker = handCards.some(c => c.isJoker);
   const nonJokers = handCards.filter(c => !c.isJoker);
