@@ -938,7 +938,8 @@ function GameBoard({
                 } catch (err) {
                   console.error("Failed to start next round", err);
                 }
-              }} 
+              }}
+              onLeave={leave}
             />
           )}
         </AnimatePresence>
