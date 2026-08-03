@@ -10,7 +10,8 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("draw"), clientId: z.string(), source: z.enum(["stock", "discard"]) }),
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
-  z.object({ action: z.literal("next_round"), clientId: z.string() }), // <-- Added next_round here!
+  z.object({ action: z.literal("next_round"), clientId: z.string() }),
+  z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }), // <-- THE CHEAT ACTION
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
   z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
@@ -37,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ error: "Player not seated in this room." }, { status: 403 });
   }
 
-  // 2. Intercept next_round action (doesn't need to check turn order)
+  // 2. Intercept actions that don't need turn-order validation
   if (parsed.data.action === "next_round") {
     startNextRound(room);
     await saveRoom(room);
@@ -45,7 +46,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ ok: true });
   }
 
-  // 3. Ensure it's the player's turn for game moves
+  if (parsed.data.action === "cheat_set_hand") {
+    if (room.hostClientId !== parsed.data.clientId) {
+      return NextResponse.json({ error: "Only the host can use the cheat manager!" }, { status: 403 });
+    }
+    const seat = room.seats[seatIdx];
+    if (seat) {
+      seat.hand = parsed.data.newHand;
+    }
+    await saveRoom(room);
+    await publishRoomUpdate(room.code);
+    return NextResponse.json({ ok: true });
+  }
+
+  // 3. Ensure it's the player's turn for standard game moves
   if (room.game.turnIdx !== seatIdx) {
     return NextResponse.json({ error: "Not your turn!" }, { status: 400 });
   }
