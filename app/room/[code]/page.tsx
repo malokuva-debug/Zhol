@@ -987,7 +987,14 @@ function GameBoard({
             <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard || "" })} variant="ghost">Discard</ActionButton>
           </div>
         </div>
-        <HandFan cards={showingScore ? [] : displayGame.yourHand} selectedCard={selectedCard} onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} interactive={canAct && !showingScore} meldIndexByCard={meldIndexByCard} onDragEnd={handleDragEnd} insertAtX={dropX} />
+        <HandFan 
+  cards={showingScore ? [] : displayGame.yourHand} 
+  selectedCard={selectedCard} 
+  onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} 
+  interactive={canAct && !showingScore} 
+  onDragEnd={handleDragEnd} 
+  insertAtX={dropX} 
+/>
       </div>
 
       <PlayerStrip nickname={you?.nickname ?? "You"} connected={!!you?.connected} cardCount={displayGame.yourHand.length} score={you?.score ?? 0} eliminated={you?.eliminated ?? false} isTurn={displayGame.turnIdx === yourSeat} />
