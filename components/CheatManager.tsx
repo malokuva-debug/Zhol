@@ -14,32 +14,29 @@ interface Props {
 export default function CheatManager({ roomCode, clientId, gameState, onClose }: Props) {
   const [busy, setBusy] = useState(false);
 
-  // If it's your turn, you need 11 cards to discard one. If not, 10.
   const isMyTurn = gameState.turnIdx === gameState.yourSeat;
   const targetLength = isMyTurn ? 11 : 10;
 
-  // We explicitly define the 11th card so you can discard exactly what is needed
-  // to trigger the specific Zhol bonus.
   const CHEAT_HANDS = [
     {
       label: "Normal Zhol (-10 pts)",
       cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "QC"],
-      extraCard: "2C" // Discarding a regular card
+      extraCard: "2C" 
     },
     {
       label: "Joker Zhol (-20 pts)",
-      cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "QC"],
-      extraCard: "JK1" // Discarding a Joker
+      cards: ["10H", "10D", "10C", "10S", "JH", "JD", "JC", "QH", "QD", "JK1"],
+      extraCard: "2C" 
     },
     {
       label: "Suit Zhol (-25 pts)",
       cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "10S"],
-      extraCard: "2C" // Discarding a regular card, leaving all Spades
+      extraCard: "2H" 
     },
     {
       label: "Suit + Joker Zhol! (-50 pts)",
-      cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "10S"],
-      extraCard: "JK1" // Discarding a Joker, leaving all Spades
+      cards: ["AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "JK1"],
+      extraCard: "2H" 
     }
   ];
 
@@ -47,7 +44,6 @@ export default function CheatManager({ roomCode, clientId, gameState, onClose }:
     setBusy(true);
     const newHand = [...cheat.cards];
     
-    // Append the specific extra card needed to pull off this Zhol
     if (targetLength === 11) newHand.push(cheat.extraCard);
 
     try {
