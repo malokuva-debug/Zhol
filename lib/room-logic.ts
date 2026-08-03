@@ -393,11 +393,14 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const winnerSeat = room.seats[seatIdx];
   if (!winnerSeat) return { error: "No seat." };
 
+  // Remove the discarded card from hand
   const idx = winnerSeat.hand.indexOf(cardId);
   if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
-  const isJokerDiscard = isJokerId(cardId);
+  // --- 1. DETERMINE ZHOL BONUS TYPE ---
+  // The 10 remaining cards determine if you USED a Joker in your melds!
   const handCards = winnerSeat.hand.map(makeCard);
+  const hasJoker = handCards.some(c => c.isJoker);
   const nonJokers = handCards.filter(c => !c.isJoker);
   const firstSuit = nonJokers.length > 0 ? nonJokers[0].suit : null;
   const isSuitGin = nonJokers.length > 0 && nonJokers.every(c => c.suit === firstSuit);
@@ -405,13 +408,13 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   let winBonus = 10;
   let ginType: GinType = "normal_gin";
 
-  if (isSuitGin && isJokerDiscard) {
+  if (isSuitGin && hasJoker) {
     winBonus = 50;
     ginType = "suit_joker_gin";
-  } else if (isSuitGin && !isJokerDiscard) {
+  } else if (isSuitGin && !hasJoker) {
     winBonus = 25;
     ginType = "suit_gin";
-  } else if (!isSuitGin && isJokerDiscard) {
+  } else if (!isSuitGin && hasJoker) {
     winBonus = 20;
     ginType = "joker_gin";
   }
@@ -455,7 +458,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     pointsBySeat
   };
 
-  // Pause on round_over to let the client play animations and wait for button click!
   room.game.turnPhase = "round_over";
 
   const remainingSeats = room.seats
@@ -466,7 +468,7 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
     const finalWinnerIdx = remainingSeats.length === 1 ? remainingSeats[0] : seatIdx;
     room.game.matchOver = true;
     room.game.matchWinnerIdx = finalWinnerIdx;
-    room.status = "finished"; // Set room to finished if match is over
+    room.status = "finished"; 
     
     const finalWinner = room.seats[finalWinnerIdx];
     addSystemMessage(room, `Match over! ${finalWinner?.nickname || winnerSeat.nickname} wins!`);
