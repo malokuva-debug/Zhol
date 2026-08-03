@@ -1,4 +1,5 @@
 // Core domain types for Zhol, Pishpirik, and Cicmic
+import type { CicmicCell } from "./cicmic-engine";
 
 export type Suit = "S" | "H" | "D" | "C";
 export type Rank = "A" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K";
@@ -25,9 +26,7 @@ export type Visibility = "public" | "private";
 
 export type GinType = "normal_gin" | "joker_gin" | "suit_gin" | "suit_joker_gin";
 
-import type { CicmicCell } from "./cicmic-engine";
-
-// --- NEW GAME MODES ---
+// --- GAME MODES & FORMATS ---
 export type GameMode = "zhol" | "pishpirik" | "cicmic";
 export type ZholMode = "classic" | "free_play";
 export type TeamMode = "1v1" | "2v2" | "free";
@@ -40,7 +39,7 @@ export interface RoomRules {
   ginBonusJoker: number;      // e.g., 20
   ginBonusSuit: number;       // e.g., 25
   ginBonusSuitJoker: number;  // e.g., 50
-  turnTimerSeconds?: number;  // Optional / set to 0 (disabled)
+  turnTimerSeconds?: number;  // Set to 0 (disabled)
   mode: GameMode;             // "zhol" | "pishpirik" | "cicmic"
   zholMode?: ZholMode;        // "classic" | "free_play"
   allowEliminations: boolean; // false when zholMode is "free_play"
@@ -48,19 +47,23 @@ export interface RoomRules {
 
 export interface HouseRules {
   gameMode: GameMode;
+  zholMode?: ZholMode;
   teamMode?: TeamMode;
   ginBonuses: { gin: number; bigGin: number; superGin: number };
   eliminationScore: number;
   turnTimerSeconds: number;
   jokerCount: 0 | 2 | 4;
+  allowEliminations: boolean; // Controls whether players eliminate at limit
 }
 
 export const DEFAULT_HOUSE_RULES: HouseRules = {
   gameMode: "zhol",
+  zholMode: "classic",
   ginBonuses: { gin: 25, bigGin: 50, superGin: 100 },
   eliminationScore: 101,
   turnTimerSeconds: 0,
   jokerCount: 2,
+  allowEliminations: true,
 };
 
 export interface SeatState {
@@ -177,7 +180,7 @@ export interface ClientGameState {
   matchOver: boolean;
   matchWinnerIdx?: number;
 
-  // Expose new modes to client safely
+  // Expose game modes to client safely
   dealerIdx?: number;
   tablePile?: CardId[];
   capturedBySeat?: Record<number, CardId[]>;
