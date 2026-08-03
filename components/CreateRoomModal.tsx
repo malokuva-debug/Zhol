@@ -9,6 +9,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
   const router = useRouter();
   const [name, setName] = useState(`${nickname}'s table`);
   const [gameMode, setGameMode] = useState<"zhol" | "pishpirik" | "cicmic">("zhol");
+  const [zholMode, setZholMode] = useState<"classic" | "free_play">("classic");
   const [teamMode, setTeamMode] = useState<"1v1" | "2v2" | "free">("free");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [password, setPassword] = useState("");
@@ -42,11 +43,12 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
         body: JSON.stringify({
           name,
           gameMode,
+          zholMode: gameMode === "zhol" ? zholMode : undefined,
           teamMode,
           visibility,
           password: visibility === "private" && password ? password : undefined,
           maxPlayers,
-          eliminationScore,
+          eliminationScore: zholMode === "free_play" ? 0 : eliminationScore,
           hostNickname: nickname,
           hostClientId: getClientId(),
         }),
@@ -90,6 +92,30 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
               ))}
             </div>
           </div>
+
+          {gameMode === "zhol" && (
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wider text-white/50">Zhol Mode</label>
+              <div className="flex gap-2">
+                {[
+                  { id: "classic", label: "Classic" },
+                  { id: "free_play", label: "Free Play" },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setZholMode(mode.id as "classic" | "free_play")}
+                    className={`flex-1 rounded-lg border px-2 py-2 text-sm font-semibold transition ${
+                      zholMode === mode.id
+                        ? "border-neon-purple/60 bg-neon-purple/15 text-neon-purple-soft"
+                        : "border-white/10 text-white/50 hover:bg-white/5"
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {gameMode === "pishpirik" && (
             <div>
@@ -171,7 +197,7 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
             </div>
           </div>
 
-          {gameMode === "zhol" && (
+          {gameMode === "zhol" && zholMode === "classic" && (
             <div>
               <label className="mb-1 flex justify-between text-xs font-medium uppercase tracking-wider text-white/50">
                 <span>Score Limit</span>
@@ -187,6 +213,12 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
                 className="w-full accent-[#a35bff]"
               />
             </div>
+          )}
+
+          {gameMode === "zhol" && zholMode === "free_play" && (
+            <p className="text-xs text-white/40 leading-relaxed">
+              Free Play mode — play continuously without eliminations or score limits.
+            </p>
           )}
 
           {gameMode === "pishpirik" && (
