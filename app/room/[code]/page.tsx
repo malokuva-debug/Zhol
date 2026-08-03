@@ -7,7 +7,7 @@ import { getNickname, getClientId, addRecentRoom, removeRecentRoom } from "@/lib
 import { useLiveData } from "@/lib/use-live-data";
 import { roomChannel, EVENTS } from "@/lib/pusher";
 import type { Room, ClientGameState } from "@/lib/types";
-import { minimizeDeadwood, canGin, resolveJokerPlaceholders, isJokerId, makeCard } from "@/lib/gin-engine";
+import { minimizeDeadwood, canGin, isJokerId, makeCard } from "@/lib/gin-engine";
 import PlayingCard from "@/components/PlayingCard";
 import CheatManager from "@/components/CheatManager";
 import HandFan from "@/components/HandFan";
@@ -20,6 +20,74 @@ interface StateResponse {
   room: Omit<Room, "passwordHash">;
   yourSeat: number | null;
   game: ClientGameState | null;
+}
+
+// --- POSITIONAL MELD DETECTION (RESPECTS PHYSICAL JOKER PLACEMENT) ---
+const RANK_LOW: Record<string, number> = { A: 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13 };
+const RANK_HIGH: Record<string, number> = { ...RANK_LOW, A: 14 };
+
+function getPositionalMeldIndices(handIds: string[]) {
+  const cards = handIds.map(makeCard);
+  let bestMelds: number[][] = [];
+  
+  const isValid = (sub: any[]) => {
+    if (sub.length < 3) return false;
+    const nonJokers = sub.filter(c => !c.isJoker);
+    if (nonJokers.length <= 1) return true; // Multiple jokers + 0/1 card is always a valid run/set logically
+
+    // Check Set
+    if (nonJokers.every(c => c.rank === nonJokers[0].rank) && sub.length <= 4) {
+      return true;
+    }
+
+    // Check Run
+    const suit = nonJokers[0].suit;
+    if (!nonJokers.every(c => c.suit === suit)) return false;
+
+    const checkSeq = (rankMap: Record<string, number>) => {
+      let firstRealIdx = sub.findIndex(c => !c.isJoker);
+      let startVal = rankMap[sub[firstRealIdx].rank] - firstRealIdx;
+      if (startVal < 1) return false;
+      for (let i = 0; i < sub.length; i++) {
+        if (!sub[i].isJoker) {
+          if (rankMap[sub[i].rank] !== startVal + i) return false;
+        }
+      }
+      if (startVal + sub.length - 1 > 14) return false;
+      return true;
+    };
+
+    return checkSeq(RANK_LOW) || checkSeq(RANK_HIGH);
+  };
+
+  function search(startIndex: number, currentMelds: number[][]) {
+    const currentCovered = currentMelds.reduce((sum, m) => sum + m.length, 0);
+    const bestCovered = bestMelds.reduce((sum, m) => sum + m.length, 0);
+    if (currentCovered > bestCovered) {
+      bestMelds = [...currentMelds];
+    }
+
+    for (let i = startIndex; i < cards.length; i++) {
+      for (let j = i + 2; j < cards.length; j++) {
+        const sub = cards.slice(i, j + 1);
+        if (isValid(sub)) {
+          const indices = [];
+          for(let k=i; k<=j; k++) indices.push(k);
+          search(j + 1, [...currentMelds, indices]);
+        }
+      }
+    }
+  }
+
+  search(0, []);
+
+  const meldIndexByCard: Record<string, number> = {};
+  bestMelds.forEach((meldIndices, meldIdx) => {
+    meldIndices.forEach(idx => {
+      meldIndexByCard[handIds[idx]] = meldIdx;
+    });
+  });
+  return meldIndexByCard;
 }
 
 export default function RoomPage() {
@@ -710,15 +778,8 @@ function GameBoard({
   const canAct = isYourTurn && displayGame.turnPhase === "discard";
   const playableHand = displayGame.yourHand.filter((id) => id !== "__DRAWING__");
 
-  const deadwoodInfo = useMemo(() => minimizeDeadwood(playableHand), [playableHand]);
-  const jokersInHand = useMemo(() => playableHand.filter(isJokerId), [playableHand]);
-  const resolvedMelds = useMemo(() => resolveJokerPlaceholders(deadwoodInfo.melds, jokersInHand), [deadwoodInfo, jokersInHand]);
-  
-  const meldIndexByCard = useMemo(() => {
-    const map: Record<string, number> = {};
-    resolvedMelds.forEach((m, idx) => m.cards.forEach((c) => (map[c] = idx)));
-    return map;
-  }, [resolvedMelds]);
+  // Visual Positional Highlights
+  const meldIndexByCard = useMemo(() => getPositionalMeldIndices(playableHand), [playableHand]);
 
   // Evaluate the best Gin discard card to accurately label the Zhol button
   const ginEval = useMemo(() => {
@@ -974,7 +1035,10 @@ function GameBoard({
 
       <div className="glass rounded-2xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-white/70">Deadwood: <span className={deadwoodInfo.deadwood === 0 ? "text-neon-blue-soft" : "text-white"}>{deadwoodInfo.deadwood}</span></span>
+          <span className="text-sm font-semibold text-white/70">
+            {/* We no longer show exact deadwood points here because we disabled the live auto-solver for the UI */}
+            Your Hand
+          </span>
           <div className="flex flex-wrap gap-2">
             <ActionButton 
               ref={ginRef} 
@@ -987,14 +1051,7 @@ function GameBoard({
             <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard || "" })} variant="ghost">Discard</ActionButton>
           </div>
         </div>
-        <HandFan 
-  cards={showingScore ? [] : displayGame.yourHand} 
-  selectedCard={selectedCard} 
-  onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} 
-  interactive={canAct && !showingScore} 
-  onDragEnd={handleDragEnd} 
-  insertAtX={dropX} 
-/>
+        <HandFan cards={showingScore ? [] : displayGame.yourHand} selectedCard={selectedCard} onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} interactive={canAct && !showingScore} meldIndexByCard={meldIndexByCard} onDragEnd={handleDragEnd} insertAtX={dropX} />
       </div>
 
       <PlayerStrip nickname={you?.nickname ?? "You"} connected={!!you?.connected} cardCount={displayGame.yourHand.length} score={you?.score ?? 0} eliminated={you?.eliminated ?? false} isTurn={displayGame.turnIdx === yourSeat} />
