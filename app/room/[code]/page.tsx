@@ -908,7 +908,24 @@ function GameBoard({
         </div>
 
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
-        <AnimatePresence>{showingScore && displayGame.lastRoundEnd && <RoundEndReveal info={displayGame.lastRoundEnd} room={room} roundKey={displayGame.roundNumber} />}</AnimatePresence>
+        <AnimatePresence>
+  {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
+    <RoundEndReveal 
+      gameState={displayGame} 
+      onNextRound={async () => {
+        try {
+          await fetch(`/api/rooms/${room.code}/move`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "next_round", clientId }), // Assuming clientId is defined in your page scope
+          });
+        } catch (err) {
+          console.error("Failed to start next round", err);
+        }
+      }} 
+    />
+  )}
+</AnimatePresence>
         <AnimatePresence>{displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}</AnimatePresence>
       </div>
 
