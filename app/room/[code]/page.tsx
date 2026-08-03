@@ -9,6 +9,7 @@ import { roomChannel, EVENTS } from "@/lib/pusher";
 import type { Room, ClientGameState } from "@/lib/types";
 import { minimizeDeadwood, canGin, findGinDiscard, resolveJokerPlaceholders, isJokerId } from "@/lib/gin-engine";
 import PlayingCard from "@/components/PlayingCard";
+import CheatManager from "@/components/CheatManager";
 import HandFan from "@/components/HandFan";
 import OpponentFan from "@/components/OpponentFan";
 import DealAnimation, { type DealTarget } from "@/components/DealAnimation";
@@ -591,6 +592,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     </div>
   );
 }
+
 // ----------------------------------------------------------------------
 // PISHPIRIK BOARD
 // ----------------------------------------------------------------------
@@ -689,10 +691,23 @@ function GameBoard({
   const [optimisticGame, setOptimisticGame] = useState<ClientGameState | null>(null);
   const [isDraggingStock, setIsDraggingStock] = useState(false);
   const [dropX, setDropX] = useState<number | null>(null);
-  
+  const [showCheat, setShowCheat] = useState(false);
+
   useEffect(() => {
     setOptimisticGame(game);
   }, [game]);
+
+  // SECRET OVERRIDE SHORTCUT: Ctrl + Shift + K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCheat(prev => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const displayGame = optimisticGame || game;
   const topStockCard = displayGame.deck.length > 0 ? displayGame.deck[displayGame.deck.length - 1] : null;
@@ -851,7 +866,7 @@ function GameBoard({
 
       <div className="felt-table relative rounded-3xl p-6">
         <div className="flex items-center justify-between text-xs text-white/50">
-          <span>Round {displayGame.roundNumber} • Out at {room.rules.eliminationScore}</span>
+          <span>Round {displayGame.roundNumber} • {room.rules.eliminationScore > 0 ? `Out at ${room.rules.eliminationScore}` : "Free Play"}</span>
         </div>
 
         <div className={`flex items-center justify-center gap-6 sm:gap-12 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
@@ -908,24 +923,26 @@ function GameBoard({
         </div>
 
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
+        
         <AnimatePresence>
-  {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
-    <RoundEndReveal 
-      gameState={displayGame} 
-      onNextRound={async () => {
-        try {
-          await fetch(`/api/rooms/${room.code}/move`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "next_round", clientId }), // Assuming clientId is defined in your page scope
-          });
-        } catch (err) {
-          console.error("Failed to start next round", err);
-        }
-      }} 
-    />
-  )}
-</AnimatePresence>
+          {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
+            <RoundEndReveal 
+              gameState={displayGame} 
+              onNextRound={async () => {
+                try {
+                  await fetch(`/api/rooms/${room.code}/move`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "next_round", clientId }),
+                  });
+                } catch (err) {
+                  console.error("Failed to start next round", err);
+                }
+              }} 
+            />
+          )}
+        </AnimatePresence>
+
         <AnimatePresence>{displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}</AnimatePresence>
       </div>
 
@@ -941,6 +958,16 @@ function GameBoard({
       </div>
 
       <PlayerStrip nickname={you?.nickname ?? "You"} connected={!!you?.connected} cardCount={displayGame.yourHand.length} score={you?.score ?? 0} eliminated={you?.eliminated ?? false} isTurn={displayGame.turnIdx === yourSeat} />
+
+      {/* SECRET CHEAT MANAGER */}
+      {showCheat && displayGame && (
+        <CheatManager 
+          roomCode={room.code}
+          clientId={clientId}
+          gameState={displayGame}
+          onClose={() => setShowCheat(false)} 
+        />
+      )}
     </div>
   );
 }
