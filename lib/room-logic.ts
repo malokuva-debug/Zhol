@@ -1,5 +1,5 @@
 import { Room, SeatState, ClientGameState, HouseRules } from "./types";
-import { freshDeckIds } from "./gin-engine";
+import { freshDeckIds, minimizeDeadwood } from "./gin-engine";
 
 const RECONNECT_WINDOW_MS = 60_000;
 
@@ -12,13 +12,16 @@ export function newRoom(opts: {
   hostClientId: string;
   rules: {
     gameMode: "zhol" | "pishpirik" | "cicmic";
+    zholMode?: "classic" | "free_play";
     teamMode?: "1v1" | "2v2" | "free";
-    turnTimerSeconds: number;
+    turnTimerSeconds?: number;
     eliminationScore: number;
   };
 }): Room {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   const seats: (SeatState | null)[] = Array(opts.maxPlayers).fill(null);
+
+  const isFreePlay = opts.rules.gameMode === "zhol" && opts.rules.zholMode === "free_play";
 
   seats[0] = {
     nickname: opts.hostNickname,
@@ -44,11 +47,13 @@ export function newRoom(opts: {
     game: null,
     rules: {
       gameMode: opts.rules.gameMode,
+      zholMode: opts.rules.zholMode,
       teamMode: opts.rules.teamMode,
       ginBonuses: { gin: 25, bigGin: 50, superGin: 100 },
-      eliminationScore: opts.rules.eliminationScore,
-      turnTimerSeconds: opts.rules.turnTimerSeconds,
+      eliminationScore: isFreePlay ? 0 : opts.rules.eliminationScore,
+      turnTimerSeconds: 0, // Turn timer disabled
       jokerCount: 2,
+      allowEliminations: !isFreePlay,
     },
     systemMessages: [`Room ${code} created by ${opts.hostNickname}.`],
     chat: [],
@@ -180,7 +185,6 @@ export function initializeGame(room: Room) {
     const tablePile = deck.splice(0, 4);
 
     const activeSeatIndices = room.seats.map((s, i) => (s ? i : -1)).filter((i) => i !== -1);
-    // Rotate the starting dealer each new match so it isn't always the same seat.
     const dealerIdx = activeSeatIndices[Math.floor(Math.random() * activeSeatIndices.length)];
 
     room.seats.forEach((seat) => {
@@ -224,9 +228,9 @@ export function initializeGame(room: Room) {
   room.game = {
     roundNumber: 1,
     turnIdx: starterSeat,
-    turnPhase: starterSeat === 0 ? "discard" : "draw",
+    turnPhase: "discard", // Starter gets 11 cards, so they must discard
     turnStartedAt: Date.now(),
-    turnTimerSeconds: room.rules.turnTimerSeconds,
+    turnTimerSeconds: 0,
     deck,
     discard: topDiscard ? [topDiscard] : [],
     discardTop: topDiscard,
@@ -290,7 +294,6 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
 }
 
 function generateStandardDeck(): string[] {
-  // 52 cards, no jokers — used by Pishpirik. Ids match gin-engine's format ("10S", not "TS").
   return freshDeckIds(1, 0);
 }
 
@@ -351,15 +354,92 @@ export function applyDiscard(room: Room, seatIdx: number, cardId: string) {
   return { ok: true };
 }
 
+export function startNextRound(room: Room) {
+  if (!room.game) return;
+
+  const mode = room.rules.gameMode;
+  const activeSeats = room.seats
+    .map((s, i) => (s && !s.eliminated ? i : -1))
+    .filter((i) => i !== -1);
+
+  if (mode === "zhol") {
+    const deck = generateZholDeck(activeSeats.length);
+    shuffle(deck);
+
+    // Rotate starter seat clockwise among remaining active players
+    let nextStarter = activeSeats.indexOf(room.game.turnIdx) + 1;
+    if (nextStarter >= activeSeats.length || nextStarter === -1) nextStarter = 0;
+    const starterSeat = activeSeats[nextStarter];
+
+    activeSeats.forEach((seatIdx) => {
+      const count = seatIdx === starterSeat ? 11 : 10;
+      room.seats[seatIdx]!.hand = deck.splice(0, count);
+    });
+
+    const topDiscard = deck.pop() || null;
+
+    room.game = {
+      roundNumber: room.game.roundNumber + 1,
+      turnIdx: starterSeat,
+      turnPhase: "discard", // Starter gets 11 cards, must discard first
+      turnStartedAt: Date.now(),
+      turnTimerSeconds: 0,
+      deck,
+      discard: topDiscard ? [topDiscard] : [],
+      discardTop: topDiscard,
+      matchOver: false,
+    };
+  }
+}
+
 export function applyGin(room: Room, seatIdx: number, cardId: string) {
   if (!room.game) return { error: "No game." };
-  const seat = room.seats[seatIdx];
-  if (!seat) return { error: "No seat." };
+  const winnerSeat = room.seats[seatIdx];
+  if (!winnerSeat) return { error: "No seat." };
 
-  const idx = seat.hand.indexOf(cardId);
-  if (idx !== -1) seat.hand.splice(idx, 1);
+  const idx = winnerSeat.hand.indexOf(cardId);
+  if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
-  room.game.matchOver = true;
-  room.game.matchWinnerIdx = seatIdx;
+  // 1. Calculate deadwood points and update running scores
+  const winBonus = room.rules.ginBonuses?.gin || 25;
+
+  room.seats.forEach((seat, i) => {
+    if (!seat || seat.eliminated) return;
+
+    if (i === seatIdx) {
+      seat.score -= winBonus; // Winner subtracts bonus points
+    } else {
+      const res = minimizeDeadwood(seat.hand);
+      seat.score += res.deadwood; // Non-winners add deadwood
+    }
+
+    // Eliminate player if score exceeds threshold in Classic mode
+    if (room.rules.allowEliminations && seat.score >= room.rules.eliminationScore) {
+      seat.eliminated = true;
+      addSystemMessage(room, `${seat.nickname} has been eliminated!`);
+    }
+  });
+
+  // 2. Count active remaining players
+  const remainingSeats = room.seats
+    .map((s, i) => (s && !s.eliminated ? i : -1))
+    .filter((i) => i !== -1);
+
+  // 3. Game Over condition
+  if (room.rules.allowEliminations && remainingSeats.length <= 1) {
+    const finalWinnerIdx = remainingSeats.length === 1 ? remainingSeats[0] : seatIdx;
+    
+    room.game.matchOver = true;
+    room.game.matchWinnerIdx = finalWinnerIdx;
+    room.status = "finished";
+    
+    const finalWinner = room.seats[finalWinnerIdx];
+    addSystemMessage(room, `Match over! ${finalWinner?.nickname || winnerSeat.nickname} wins!`);
+  } else {
+    // Continue playing next deal
+    addSystemMessage(room, `${winnerSeat.nickname} declared Zhol! Starting next round...`);
+    startNextRound(room);
+  }
+
   return { ok: true };
 }
