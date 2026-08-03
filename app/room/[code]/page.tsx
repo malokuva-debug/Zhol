@@ -199,15 +199,7 @@ export default function RoomPage() {
             />
           )}
 
-          {/* FLOATING CHAT BOX */}
-          <ChatBox room={room} clientId={clientId} />
-        </>
-      )}
-    </main>
-  );
-}
-
-// ----------------------------------------------------------------------
+          // ----------------------------------------------------------------------
 // IN-ROOM CHAT BOX
 // ----------------------------------------------------------------------
 
@@ -215,12 +207,40 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Floating chat states
+  const [recentMessages, setRecentMessages] = useState<{ id: string; nickname?: string; text: string }[]>([]);
+  const lastMsgIdRef = useRef<string | null>(null);
 
+  // Auto-scroll when full chat is open
   useEffect(() => {
     if (isOpen && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [room.chat, isOpen]);
+
+  // Listen for new messages and pop them up as toasts
+  useEffect(() => {
+    if (room.chat.length === 0) return;
+    const latestMsg = room.chat[room.chat.length - 1];
+    
+    // Only trigger if it's a completely new message
+    if (latestMsg.id !== lastMsgIdRef.current) {
+      lastMsgIdRef.current = latestMsg.id;
+      
+      setRecentMessages(prev => {
+        // Prevent duplicates
+        if (prev.find(m => m.id === latestMsg.id)) return prev;
+        // Keep only the last 3 floating messages on screen
+        return [...prev, latestMsg].slice(-3);
+      });
+
+      // Remove the message from the screen after 4.5 seconds
+      setTimeout(() => {
+        setRecentMessages(prev => prev.filter(m => m.id !== latestMsg.id));
+      }, 4500);
+    }
+  }, [room.chat]);
 
   async function sendChat(e: React.FormEvent) {
     e.preventDefault();
@@ -236,6 +256,27 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
 
   return (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end pointer-events-none">
+      
+      {/* FLOATING TOAST MESSAGES (Visible when chat is closed) */}
+      <AnimatePresence>
+        {!isOpen && recentMessages.length > 0 && (
+          <div className="mb-4 flex flex-col items-end gap-2 pointer-events-none">
+            {recentMessages.map(msg => (
+              <motion.div 
+                key={`toast-${msg.id}`}
+                initial={{ opacity: 0, x: 20, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="glass rounded-xl px-4 py-2 text-sm shadow-[0_0_15px_rgba(0,0,0,0.5)] border border-white/10 bg-black/70 max-w-[280px] backdrop-blur-md"
+              >
+                <span className="font-bold text-neon-purple-soft drop-shadow-md">{msg.nickname}: </span>
+                <span className="text-white/90 break-words font-medium drop-shadow-md">{msg.text}</span>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {isOpen && (
           <motion.div
