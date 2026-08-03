@@ -29,9 +29,22 @@ import type { CicmicCell } from "./cicmic-engine";
 
 // --- NEW GAME MODES ---
 export type GameMode = "zhol" | "pishpirik" | "cicmic";
+export type ZholMode = "classic" | "free_play";
 export type TeamMode = "1v1" | "2v2" | "free";
 export type CicmicPlayer = 1 | 2;
 export type CicmicPhase = "placement" | "movement" | "flying";
+
+export interface RoomRules {
+  winScore: number;           // e.g., 101
+  ginBonusNormal: number;     // e.g., 10
+  ginBonusJoker: number;      // e.g., 20
+  ginBonusSuit: number;       // e.g., 25
+  ginBonusSuitJoker: number;  // e.g., 50
+  turnTimerSeconds?: number;  // Optional / set to 0 (disabled)
+  mode: GameMode;             // "zhol" | "pishpirik" | "cicmic"
+  zholMode?: ZholMode;        // "classic" | "free_play"
+  allowEliminations: boolean; // false when zholMode is "free_play"
+}
 
 export interface HouseRules {
   gameMode: GameMode;
