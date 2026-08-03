@@ -3,23 +3,144 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { ClientGameState } from "@/lib/types";
+import { makeCard } from "@/lib/gin-engine";
 
 interface Props {
   gameState: ClientGameState;
   onNextRound: () => void;
 }
 
+// 🃏 Helper to visually render the actual deadwood cards
+function MiniCard({ cardId }: { cardId: string }) {
+  const card = makeCard(cardId);
+  const isRed = card.suit === "H" || card.suit === "D";
+  const suitSymbol = 
+    card.suit === "H" ? "♥" : 
+    card.suit === "D" ? "♦" : 
+    card.suit === "C" ? "♣" : 
+    card.suit === "S" ? "♠" : "";
+
+  return (
+    <div className={`flex flex-col items-center justify-center w-12 h-16 bg-white rounded shadow-md border border-slate-300 ${isRed ? 'text-red-600' : 'text-slate-900'}`}>
+      {card.isJoker ? (
+        <span className="text-[10px] font-black rotate-90 text-[#a35bff] tracking-widest">JOKER</span>
+      ) : (
+        <>
+          <span className="text-sm font-black leading-none">{card.rank}</span>
+          <span className="text-lg leading-none">{suitSymbol}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// 🧮 Individual row for counting a player's deadwood
+function DeadwoodRow({ 
+  name, 
+  deadwood, 
+  deadCards, 
+  eliminated, 
+  isWinner 
+}: { 
+  name: string; 
+  deadwood: number; 
+  deadCards: string[]; 
+  eliminated: boolean; 
+  isWinner: boolean;
+}) {
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15 } // Count cards one by one (0.15s gap)
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, scale: 0.5, x: 20 },
+    show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } }
+  };
+
+  return (
+    <div className="flex flex-col bg-slate-800/80 border border-slate-700 p-4 rounded-xl mb-3 text-left">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-slate-200 font-semibold text-lg">
+          {name} 
+          {eliminated && <span className="text-neon-pink text-[10px] uppercase font-bold tracking-wider ml-2 bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
+        </span>
+        
+        {isWinner ? (
+           <motion.span 
+             initial={{ opacity: 0, scale: 0.5 }} 
+             animate={{ opacity: 1, scale: 1 }} 
+             transition={{ delay: 0.5 }}
+             className="font-black text-emerald-400 text-lg uppercase tracking-wide"
+           >
+             Winner!
+           </motion.span>
+        ) : (
+           <motion.span 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             // Reveal the total score exactly after all cards finish popping in
+             transition={{ delay: deadCards.length * 0.15 + 0.3 }}
+             className="font-black text-red-400 text-xl"
+           >
+             +{deadwood} pts
+           </motion.span>
+        )}
+      </div>
+      
+      {!isWinner && deadCards.length > 0 && (
+        <motion.div 
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="flex flex-wrap gap-2 mt-1 min-h-[4rem]" // min-h prevents layout jumps while counting
+        >
+          {deadCards.map((id, i) => (
+            <motion.div key={`${id}-${i}`} variants={item}>
+              <MiniCard cardId={id} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
+      
+      {!isWinner && deadCards.length === 0 && (
+        <div className="mt-1 min-h-[4rem] flex items-center text-slate-500 italic text-sm">
+          No deadwood
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RoundEndReveal({ gameState, onNextRound }: Props) {
   // 'smash' plays the impact animation, 'counting' shows the deadwood tally
   const [phase, setPhase] = useState<"smash" | "counting">("smash");
+  const [showButton, setShowButton] = useState(false);
 
   useEffect(() => {
     if (gameState.turnPhase === "round_over") {
       setPhase("smash");
-      const t = setTimeout(() => setPhase("counting"), 2500); // Wait 2.5s for smash sequence
-      return () => clearTimeout(t);
+      setShowButton(false);
+      
+      // Transition from Smash to Counting after 2.5 seconds
+      const t1 = setTimeout(() => setPhase("counting"), 2500); 
+      return () => clearTimeout(t1);
     }
   }, [gameState.turnPhase]);
+
+  useEffect(() => {
+    if (phase === "counting" && gameState.lastRoundEnd) {
+      // Calculate how long the longest hand takes to count so the Next button fades in perfectly
+      const maxDeadCards = Math.max(...gameState.lastRoundEnd.pointsBySeat.map(p => p.deadCards?.length || 0));
+      const countingDuration = (maxDeadCards * 150) + 1200; // ms
+      
+      const t2 = setTimeout(() => setShowButton(true), countingDuration);
+      return () => clearTimeout(t2);
+    }
+  }, [phase, gameState.lastRoundEnd]);
 
   if (gameState.turnPhase !== "round_over" || !gameState.lastRoundEnd) return null;
 
@@ -33,7 +154,7 @@ export default function RoundEndReveal({ gameState, onNextRound }: Props) {
     "ZHOL!";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md">
       
       {phase === "smash" ? (
         <div className="relative flex items-center justify-center w-full h-full overflow-hidden">
@@ -71,48 +192,55 @@ export default function RoundEndReveal({ gameState, onNextRound }: Props) {
       ) : (
         /* 3. The Deadwood Counting Panel */
         <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-slate-900 border border-slate-700 p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl"
+          initial={{ opacity: 0, y: 50, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl mx-4"
         >
-          <h2 className="text-3xl font-bold text-[#a35bff] mb-2">{ginLabel}</h2>
-          <p className="text-slate-300 mb-6">
-            Winner Bonus: <span className="font-bold text-white">-{winnerBonus}</span> points
+          <h2 className="text-3xl font-black text-[#a35bff] mb-1 italic">{ginLabel}</h2>
+          <p className="text-slate-300 mb-6 font-medium">
+            Winner Bonus: <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded">-{winnerBonus} pts</span>
           </p>
           
-          <div className="space-y-3 mb-8">
+          <div className="space-y-4 mb-8">
             {pointsBySeat.map((p) => {
               const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
               const isMe = p.seatIdx === gameState.yourSeat;
               const name = isMe ? "You" : opp?.nickname || `Seat ${p.seatIdx + 1}`;
+              const isWinner = p.seatIdx === gameState.lastRoundEnd!.winnerIdx;
 
               return (
-                <div key={p.seatIdx} className="flex justify-between items-center bg-slate-800 p-4 rounded-lg">
-                  <span className="text-slate-200 font-medium">
-                    {name} {p.eliminated && <span className="text-red-500 text-sm ml-2">(Eliminated)</span>}
-                  </span>
-                  <span className={`font-bold ${p.deadwood > 0 ? "text-red-400" : "text-emerald-400"}`}>
-                    {p.deadwood > 0 ? `+${p.deadwood} Deadwood` : "Winner!"}
-                  </span>
-                </div>
+                <DeadwoodRow 
+                  key={p.seatIdx}
+                  name={name}
+                  deadwood={p.deadwood}
+                  deadCards={p.deadCards || []}
+                  eliminated={p.eliminated}
+                  isWinner={isWinner}
+                />
               );
             })}
           </div>
 
-          {!gameState.matchOver && (
-            <button 
-              onClick={onNextRound}
-              className="w-full py-3 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold rounded-xl transition"
-            >
-              Start Next Round
-            </button>
-          )}
-          
-          {gameState.matchOver && (
-            <div className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(5,150,105,0.5)]">
-              Match Finished!
-            </div>
-          )}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: showButton ? 1 : 0 }}
+            className="w-full"
+          >
+            {!gameState.matchOver ? (
+              <button 
+                onClick={onNextRound}
+                disabled={!showButton}
+                className="w-full py-3.5 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] disabled:cursor-not-allowed"
+              >
+                Start Next Round
+              </button>
+            ) : (
+              <div className="w-full py-3.5 bg-emerald-600 text-white font-bold text-lg rounded-xl shadow-[0_0_15px_rgba(5,150,105,0.5)]">
+                Match Finished!
+              </div>
+            )}
+          </motion.div>
         </motion.div>
       )}
     </div>
