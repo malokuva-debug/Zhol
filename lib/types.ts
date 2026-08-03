@@ -1,4 +1,3 @@
-// Core domain types for Zhol, Pishpirik, and Cicmic
 import type { CicmicCell } from "./cicmic-engine";
 
 export type Suit = "S" | "H" | "D" | "C";
