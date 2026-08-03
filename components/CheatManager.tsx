@@ -1,3 +1,4 @@
+// components/CheatManager.tsx
 "use client";
 
 import { useState } from "react";
@@ -11,14 +12,12 @@ interface Props {
   onClose: () => void;
 }
 
-export default function HostCheatManager({ roomCode, clientId, gameState, onClose }: Props) {
+export default function CheatManager({ roomCode, clientId, gameState, onClose }: Props) {
   const [busy, setBusy] = useState(false);
 
-  // If it's your turn, you need 11 cards to discard one. If not, 10.
   const isMyTurn = gameState.turnIdx === gameState.yourSeat;
   const targetLength = isMyTurn ? 11 : 10;
   
-  // Junk card to append if they need a discard
   const extraCard = "2C"; 
 
   const CHEAT_HANDS = [
@@ -68,7 +67,7 @@ export default function HostCheatManager({ roomCode, clientId, gameState, onClos
       >
         <div className="flex items-center justify-center mb-4 text-neon-pink">
           <svg className="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-          <h2 className="text-2xl font-black italic tracking-wider">HOST OVERRIDE</h2>
+          <h2 className="text-2xl font-black italic tracking-wider">SECRET OVERRIDE</h2>
         </div>
         
         <p className="text-sm text-slate-300 mb-6 font-medium">
