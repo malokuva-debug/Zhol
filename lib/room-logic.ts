@@ -232,7 +232,7 @@ export function initializeGame(room: Room) {
     discard: topDiscard ? [topDiscard] : [],
     discardTop: topDiscard,
     matchOver: false,
-    dealerIdx: starterSeat, // Track who started to rotate properly next round
+    dealerIdx: starterSeat,
   };
 }
 
@@ -364,7 +364,6 @@ export function startNextRound(room: Room) {
     const deck = generateZholDeck(activeSeats.length);
     shuffle(deck);
 
-    // Securely rotate starter clockwise from whoever started last round!
     let starterSeat = activeSeats[0];
     const prevStarter = room.game.dealerIdx ?? activeSeats[0];
     
@@ -393,7 +392,7 @@ export function startNextRound(room: Room) {
       discard: topDiscard ? [topDiscard] : [],
       discardTop: topDiscard,
       matchOver: false,
-      dealerIdx: starterSeat, // Track it for the next rotation
+      dealerIdx: starterSeat,
     };
   }
 }
@@ -406,9 +405,11 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const idx = winnerSeat.hand.indexOf(cardId);
   if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
+  // --- 1. DETERMINE ZHOL BONUS TYPE ---
+  // The type of Zhol depends on the card THROWN AWAY (cardId) and the 10 cards KEPT
   const isJokerDiscard = isJokerId(cardId);
+  
   const handCards = winnerSeat.hand.map(makeCard);
-  const hasJoker = handCards.some(c => c.isJoker);
   const nonJokers = handCards.filter(c => !c.isJoker);
   const firstSuit = nonJokers.length > 0 ? nonJokers[0].suit : null;
   const isSuitGin = nonJokers.length > 0 && nonJokers.every(c => c.suit === firstSuit);
@@ -416,13 +417,13 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   let winBonus = 10;
   let ginType: GinType = "normal_gin";
 
-  if (isSuitGin && hasJoker) {
+  if (isSuitGin && isJokerDiscard) {
     winBonus = 50;
     ginType = "suit_joker_gin";
-  } else if (isSuitGin && !hasJoker) {
+  } else if (isSuitGin && !isJokerDiscard) {
     winBonus = 25;
     ginType = "suit_gin";
-  } else if (!isSuitGin && hasJoker) {
+  } else if (!isSuitGin && isJokerDiscard) {
     winBonus = 20;
     ginType = "joker_gin";
   }
