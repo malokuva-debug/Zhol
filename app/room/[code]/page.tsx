@@ -724,29 +724,30 @@ function GameBoard({
   const ginEval = useMemo(() => {
     if (!canAct || playableHand.length !== 11) return null;
     
-    const evaluate10 = (hand10: string[]) => {
+    const evaluate10 = (hand10: string[], discardId: string) => {
       const { deadwood } = minimizeDeadwood(hand10);
       if (deadwood > 0) return null;
+      
       const cards = hand10.map(makeCard);
-      const hasJoker = cards.some(c => c.isJoker);
       const nonJokers = cards.filter(c => !c.isJoker);
       const isSuit = nonJokers.length > 0 && nonJokers.every(c => c.suit === nonJokers[0].suit);
+      const isJokerDiscard = isJokerId(discardId);
       
-      if (isSuit && hasJoker) return { bonus: 50, type: "Suit + Joker Zhol!" };
-      if (isSuit && !hasJoker) return { bonus: 25, type: "Suit Zhol!" };
-      if (!isSuit && hasJoker) return { bonus: 20, type: "Joker Zhol!" };
+      if (isSuit && isJokerDiscard) return { bonus: 50, type: "Suit + Joker Zhol!" };
+      if (isSuit && !isJokerDiscard) return { bonus: 25, type: "Suit Zhol!" };
+      if (!isSuit && isJokerDiscard) return { bonus: 20, type: "Joker Zhol!" };
       return { bonus: 10, type: "Zhol!" };
     };
 
     if (selectedCard) {
-      const res = evaluate10(playableHand.filter(id => id !== selectedCard));
+      const res = evaluate10(playableHand.filter(id => id !== selectedCard), selectedCard);
       if (res) return { discardId: selectedCard, ...res };
       return null;
     }
 
     let best: { discardId: string; bonus: number; type: string } | null = null;
     for (const discardId of playableHand) {
-      const res = evaluate10(playableHand.filter(id => id !== discardId));
+      const res = evaluate10(playableHand.filter(id => id !== discardId), discardId);
       if (res) {
         if (!best || res.bonus > best.bonus) {
           best = { discardId, ...res };
@@ -845,10 +846,7 @@ function GameBoard({
     if (prevRoundRef.current === null || displayGame.roundNumber !== prevRoundRef.current) {
       const isFirstLoad = prevRoundRef.current === null;
       prevRoundRef.current = displayGame.roundNumber;
-      
       const activeSeatIndices = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
-      
-      // Use the explicitly tracked dealerIdx from the server to guarantee perfect clockwise shifts!
       const starterSeat = displayGame.dealerIdx ?? (activeSeatIndices.length > 0 ? activeSeatIndices[0] : yourSeat);
 
       const targets: DealTarget[] = [
