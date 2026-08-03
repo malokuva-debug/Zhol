@@ -33,14 +33,10 @@ function getPositionalMeldIndices(handIds: string[]) {
   const isValid = (sub: any[]) => {
     if (sub.length < 3) return false;
     const nonJokers = sub.filter(c => !c.isJoker);
-    if (nonJokers.length <= 1) return true; // Multiple jokers + 0/1 card is always a valid run/set logically
+    if (nonJokers.length <= 1) return true;
 
-    // Check Set
-    if (nonJokers.every(c => c.rank === nonJokers[0].rank) && sub.length <= 4) {
-      return true;
-    }
+    if (nonJokers.every(c => c.rank === nonJokers[0].rank) && sub.length <= 4) return true;
 
-    // Check Run
     const suit = nonJokers[0].suit;
     if (!nonJokers.every(c => c.suit === suit)) return false;
 
@@ -202,11 +198,89 @@ export default function RoomPage() {
               setActionError={setActionError}
             />
           )}
+
+          {/* FLOATING CHAT BOX */}
+          <ChatBox room={room} clientId={clientId} />
         </>
       )}
     </main>
   );
 }
+
+// ----------------------------------------------------------------------
+// IN-ROOM CHAT BOX
+// ----------------------------------------------------------------------
+
+function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [text, setText] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [room.chat, isOpen]);
+
+  async function sendChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    const msg = text;
+    setText("");
+    await fetch(`/api/rooms/${room.code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "chat", clientId, text: msg })
+    });
+  }
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end pointer-events-none">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="w-80 h-96 glass glow-blue rounded-2xl shadow-2xl mb-4 flex flex-col pointer-events-auto overflow-hidden border border-white/10"
+          >
+            <div className="p-3 border-b border-white/10 bg-black/40 flex justify-between items-center">
+              <h3 className="font-bold text-sm text-neon-blue-soft uppercase tracking-wider">Room Chat</h3>
+              <button onClick={() => setIsOpen(false)} className="text-white/50 hover:text-white transition">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-black/20" ref={scrollRef}>
+              {room.chat.map(msg => (
+                <div key={msg.id} className="text-sm break-words">
+                  <span className="font-bold text-neon-purple-soft">{msg.nickname}: </span>
+                  <span className="text-white/90">{msg.text}</span>
+                </div>
+              ))}
+              {room.chat.length === 0 && <div className="text-white/30 italic text-sm text-center mt-4">Say hello!</div>}
+            </div>
+            <form onSubmit={sendChat} className="p-3 border-t border-white/10 bg-black/40">
+              <input
+                type="text"
+                value={text}
+                onChange={e => setText(e.target.value)}
+                placeholder="Type a message..."
+                maxLength={150}
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-neon-blue/50 focus:ring-1 focus:ring-neon-blue/50 transition"
+              />
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="pointer-events-auto flex items-center gap-2 glass glow-purple rounded-full px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-white/10"
+      >
+        💬 Chat
+      </button>
+    </div>
+  );
+}
+
 
 // ----------------------------------------------------------------------
 // HEADER & WAITING ROOM
