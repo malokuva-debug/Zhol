@@ -220,7 +220,15 @@ export function initializeGame(room: Room) {
     room.seats[seatIdx]!.hand = deck.splice(0, count);
   });
 
-  const topDiscard = deck.pop() || null;
+  // Pick top discard, ensuring it's NEVER a joker[cite: 1]
+  let topDiscard = null;
+  for (let i = deck.length - 1; i >= 0; i--) {
+    if (!isJokerId(deck[i])) {
+      topDiscard = deck.splice(i, 1)[0];
+      break;
+    }
+  }
+  if (!topDiscard && deck.length > 0) topDiscard = deck.pop() || null;
 
   room.game = {
     roundNumber: 1,
@@ -380,7 +388,15 @@ export function startNextRound(room: Room) {
       room.seats[seatIdx]!.hand = deck.splice(0, count);
     });
 
-    const topDiscard = deck.pop() || null;
+    // Pick top discard, ensuring it's NEVER a joker[cite: 1]
+    let topDiscard = null;
+    for (let i = deck.length - 1; i >= 0; i--) {
+      if (!isJokerId(deck[i])) {
+        topDiscard = deck.splice(i, 1)[0];
+        break;
+      }
+    }
+    if (!topDiscard && deck.length > 0) topDiscard = deck.pop() || null;
 
     room.game = {
       ...room.game,
@@ -410,6 +426,7 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const isJokerDiscard = isJokerId(cardId);
   
   const handCards = winnerSeat.hand.map(makeCard);
+  const hasJoker = handCards.some(c => c.isJoker);
   const nonJokers = handCards.filter(c => !c.isJoker);
   const firstSuit = nonJokers.length > 0 ? nonJokers[0].suit : null;
   const isSuitGin = nonJokers.length > 0 && nonJokers.every(c => c.suit === firstSuit);
