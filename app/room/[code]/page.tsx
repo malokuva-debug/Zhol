@@ -7,7 +7,7 @@ import { getNickname, getClientId, addRecentRoom, removeRecentRoom } from "@/lib
 import { useLiveData } from "@/lib/use-live-data";
 import { roomChannel, EVENTS } from "@/lib/pusher";
 import type { Room, ClientGameState } from "@/lib/types";
-import { minimizeDeadwood, canGin, findGinDiscard, resolveJokerPlaceholders, isJokerId } from "@/lib/gin-engine";
+import { minimizeDeadwood, canGin, resolveJokerPlaceholders, isJokerId, makeCard } from "@/lib/gin-engine";
 import PlayingCard from "@/components/PlayingCard";
 import CheatManager from "@/components/CheatManager";
 import HandFan from "@/components/HandFan";
@@ -332,8 +332,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
   const TOTAL_PIECES = 9;
 
-  // Placement is done once both players have placed all 9 pieces — tracked server-side so
-  // permanently-destroyed points (from Mills) never get confused for "still placing" cells.
   const myUnplaced = game.unplacedPieces?.[myPlayerId as 1 | 2] ?? 0;
   const enemyUnplaced = game.unplacedPieces?.[enemyPlayerId as 1 | 2] ?? 0;
   const isPlacementPhase = myUnplaced > 0 || enemyUnplaced > 0;
@@ -352,7 +350,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
     const isDestroyed = owner === "X";
     const isEmpty = owner === null || owner === undefined;
 
-    // --- 1. REMOVAL MODE ---
     if (isPendingRemoval) {
       if (owner !== enemyPlayerId) {
         setError("Click a PINK enemy piece to remove it!");
@@ -375,7 +372,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       return;
     }
 
-    // --- 2. PLACEMENT MODE ---
     if (isPlacementPhase) {
       if (isDestroyed) {
         setError("That point was destroyed by a Mill — it can never be used again!");
@@ -402,7 +398,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       return;
     }
 
-    // --- 3. MOVEMENT / FLYING MODE ---
     if (selectedFrom === null) {
       if (owner === myPlayerId) {
         setSelectedFrom(ptIdx);
@@ -411,7 +406,7 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
       }
     } else {
       if (owner === myPlayerId) {
-        setSelectedFrom(ptIdx); // Switch selection
+        setSelectedFrom(ptIdx);
         return;
       }
 
@@ -455,7 +450,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
   return (
     <div className="flex flex-col items-center gap-6">
       <div className="grid w-full max-w-lg grid-cols-2 gap-4">
-        {/* ENEMY */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${!isYourTurn ? "border-neon-pink/80 bg-neon-pink/10 shadow-[0_0_15px_rgba(255,91,200,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -484,7 +478,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
           </div>
         </div>
 
-        {/* YOU */}
         <div className={`glass flex flex-col rounded-2xl p-4 border-2 transition-all ${isYourTurn ? "border-neon-blue/80 bg-neon-blue/10 shadow-[0_0_15px_rgba(77,216,255,0.2)]" : "border-white/10"}`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -514,7 +507,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
         </div>
       </div>
 
-      {/* BANNER */}
       <div className="text-center min-h-[40px] flex items-center justify-center">
         {isYourTurn ? (
           isPendingRemoval ? (
@@ -545,7 +537,6 @@ function CicmicBoard({ room, game, yourSeat, code }: { room: Omit<Room, "passwor
 
       {error && <p className="text-neon-pink text-sm font-bold bg-neon-pink/10 px-4 py-1 rounded-lg border border-neon-pink/30">{error}</p>}
 
-      {/* THE BOARD */}
       <div className="relative w-full max-w-lg aspect-square bg-[#0f0c22] rounded-2xl border border-white/15 p-4 shadow-2xl glow-purple overflow-hidden">
         <svg className="absolute inset-0 w-full h-full pointer-events-none stroke-white/20" strokeWidth="4">
           <rect x="10%" y="10%" width="80%" height="80%" fill="none" />
@@ -729,6 +720,42 @@ function GameBoard({
     return map;
   }, [resolvedMelds]);
 
+  // Evaluate the best Gin discard card to accurately label the Zhol button
+  const ginEval = useMemo(() => {
+    if (!canAct || playableHand.length !== 11) return null;
+    
+    const evaluate10 = (hand10: string[]) => {
+      const { deadwood } = minimizeDeadwood(hand10);
+      if (deadwood > 0) return null;
+      const cards = hand10.map(makeCard);
+      const hasJoker = cards.some(c => c.isJoker);
+      const nonJokers = cards.filter(c => !c.isJoker);
+      const isSuit = nonJokers.length > 0 && nonJokers.every(c => c.suit === nonJokers[0].suit);
+      
+      if (isSuit && hasJoker) return { bonus: 50, type: "Suit + Joker Zhol!" };
+      if (isSuit && !hasJoker) return { bonus: 25, type: "Suit Zhol!" };
+      if (!isSuit && hasJoker) return { bonus: 20, type: "Joker Zhol!" };
+      return { bonus: 10, type: "Zhol!" };
+    };
+
+    if (selectedCard) {
+      const res = evaluate10(playableHand.filter(id => id !== selectedCard));
+      if (res) return { discardId: selectedCard, ...res };
+      return null;
+    }
+
+    let best: { discardId: string; bonus: number; type: string } | null = null;
+    for (const discardId of playableHand) {
+      const res = evaluate10(playableHand.filter(id => id !== discardId));
+      if (res) {
+        if (!best || res.bonus > best.bonus) {
+          best = { discardId, ...res };
+        }
+      }
+    }
+    return best;
+  }, [canAct, playableHand, selectedCard]);
+
   async function sendMove(body: Record<string, unknown>) {
     setActionError("");
     const next = { ...displayGame };
@@ -796,21 +823,18 @@ function GameBoard({
       const rect = ref.current.getBoundingClientRect();
       return x >= rect.left - 20 && x <= rect.right + 20 && y >= rect.top - 20 && y <= rect.bottom + 20;
     };
-    const achievesGin = canGin(playableHand.filter((c) => c !== cardId));
+    
+    const achievesGin = !!ginEval && ginEval.discardId === cardId;
 
     if (checkZone(ginRef)) {
       if (achievesGin) sendMove({ action: "gin", cardId });
-      else setActionError("That card does not result in a valid Gin.");
+      else setActionError("That card does not result in a valid Zhol.");
     } else if (checkZone(discardRef) || info.offset.y < -150) {
       if (achievesGin) sendMove({ action: "gin", cardId });
       else sendMove({ action: "discard", cardId });
     }
   };
 
-  const autoGinDiscard = useMemo(() => (canAct && playableHand.length === 11 ? findGinDiscard(playableHand) : null), [canAct, playableHand]);
-  const selectedAchievesGin = canAct && !!selectedCard && canGin(playableHand.filter((c) => c !== selectedCard));
-  const ginDiscardCard = selectedAchievesGin ? selectedCard : autoGinDiscard;
-  const canDeclareGin = canAct && !!ginDiscardCard;
   const turnPlayerName = displayGame.turnIdx === yourSeat ? "you" : room.seats[displayGame.turnIdx]?.nickname ?? "opponent";
 
   const prevRoundRef = useRef<number | null>(null);
@@ -951,7 +975,14 @@ function GameBoard({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-semibold text-white/70">Deadwood: <span className={deadwoodInfo.deadwood === 0 ? "text-neon-blue-soft" : "text-white"}>{deadwoodInfo.deadwood}</span></span>
           <div className="flex flex-wrap gap-2">
-            <ActionButton ref={ginRef} disabled={!canDeclareGin} onClick={() => sendMove({ action: "gin", cardId: ginDiscardCard || "" })} variant="purple">Zhol! (Gin)</ActionButton>
+            <ActionButton 
+              ref={ginRef} 
+              disabled={!ginEval} 
+              onClick={() => sendMove({ action: "gin", cardId: ginEval!.discardId })} 
+              variant="purple"
+            >
+              {ginEval ? ginEval.type : "Zhol! (Gin)"}
+            </ActionButton>
             <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard || "" })} variant="ghost">Discard</ActionButton>
           </div>
         </div>
