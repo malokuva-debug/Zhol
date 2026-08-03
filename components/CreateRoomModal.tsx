@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { getClientId } from "@/lib/client-id";
+import type { GameMode, ZholMode } from "@/lib/types";
 
 export default function CreateRoomModal({ nickname, onClose }: { nickname: string; onClose: () => void }) {
   const router = useRouter();
   const [name, setName] = useState(`${nickname}'s table`);
-  const [gameMode, setGameMode] = useState<"zhol" | "pishpirik" | "cicmic">("zhol");
-  const [zholMode, setZholMode] = useState<"classic" | "free_play">("classic");
+  const [gameMode, setGameMode] = useState<GameMode>("zhol");
+  const [zholMode, setZholMode] = useState<ZholMode>("classic");
   const [teamMode, setTeamMode] = useState<"1v1" | "2v2" | "free">("free");
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [password, setPassword] = useState("");
@@ -37,20 +38,27 @@ export default function CreateRoomModal({ nickname, onClose }: { nickname: strin
     setError("");
 
     try {
+      const isFreePlay = gameMode === "zhol" && zholMode === "free_play";
+
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
           gameMode,
-          zholMode: gameMode === "zhol" ? zholMode : undefined,
           teamMode,
           visibility,
           password: visibility === "private" && password ? password : undefined,
           maxPlayers,
-          eliminationScore: zholMode === "free_play" ? 0 : eliminationScore,
           hostNickname: nickname,
           hostClientId: getClientId(),
+          rules: {
+            gameMode,
+            zholMode: gameMode === "zhol" ? zholMode : undefined,
+            eliminationScore: isFreePlay ? 0 : eliminationScore,
+            turnTimerSeconds: 0, // No turn timer
+            allowEliminations: !isFreePlay,
+          }
         }),
       });
 
