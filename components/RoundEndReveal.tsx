@@ -212,7 +212,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
 
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }} // Instant visibility
+            animate={{ opacity: 1 }} // FIX: Make button instantly visible and clickable
             className="w-full"
           >
             {!gameState.matchOver ? (
