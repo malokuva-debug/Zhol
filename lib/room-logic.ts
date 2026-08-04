@@ -220,7 +220,6 @@ export function initializeGame(room: Room) {
     room.seats[seatIdx]!.hand = deck.splice(0, count);
   });
 
-  // Pick top discard, ensuring it's NEVER a joker[cite: 1]
   let topDiscard = null;
   for (let i = deck.length - 1; i >= 0; i--) {
     if (!isJokerId(deck[i])) {
@@ -321,6 +320,11 @@ export function applyDraw(room: Room, seatIdx: number, source: "stock" | "discar
   const seat = room.seats[seatIdx];
   if (!seat) return { error: "No seat." };
 
+  // FIX: Strict validation to prevent race conditions resulting in 9 or 12 cards
+  if (seat.hand.length !== 10) {
+    return { error: "Invalid move: You must have exactly 10 cards to draw." };
+  }
+
   if (source === "stock") {
     const card = room.game.deck.pop();
     if (!card) return { error: "Deck empty." };
@@ -341,6 +345,11 @@ export function applyDiscard(room: Room, seatIdx: number, cardId: string) {
   if (!room.game) return { error: "No game." };
   const seat = room.seats[seatIdx];
   if (!seat) return { error: "No seat." };
+
+  // FIX: Strict validation to prevent race conditions resulting in 9 or 12 cards
+  if (seat.hand.length !== 11) {
+    return { error: "Invalid move: You must have exactly 11 cards to discard." };
+  }
 
   const idx = seat.hand.indexOf(cardId);
   if (idx === -1) return { error: "Card not in hand." };
@@ -388,7 +397,6 @@ export function startNextRound(room: Room) {
       room.seats[seatIdx]!.hand = deck.splice(0, count);
     });
 
-    // Pick top discard, ensuring it's NEVER a joker[cite: 1]
     let topDiscard = null;
     for (let i = deck.length - 1; i >= 0; i--) {
       if (!isJokerId(deck[i])) {
@@ -421,8 +429,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const idx = winnerSeat.hand.indexOf(cardId);
   if (idx !== -1) winnerSeat.hand.splice(idx, 1);
 
-  // --- 1. DETERMINE ZHOL BONUS TYPE ---
-  // The type of Zhol depends on the card THROWN AWAY (cardId) and the 10 cards KEPT
   const isJokerDiscard = isJokerId(cardId);
   
   const handCards = winnerSeat.hand.map(makeCard);
