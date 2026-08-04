@@ -12,7 +12,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
   z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
-  z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }), // <-- Added Chat action
+  z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }),
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("cicmic_place"), clientId: z.string(), point: z.number() }),
   z.object({ action: z.literal("cicmic_move"), clientId: z.string(), from: z.number(), to: z.number() }),
@@ -83,15 +83,38 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   let result: { ok?: boolean; error?: string } = { error: "Action could not be executed." };
 
   switch (parsed.data.action) {
-    case "draw":
+    case "draw": {
+      const seat = room.seats[seatIdx];
+      // FIX: Strict validation to prevent double-draws (9/12 card bug)
+      if (seat && seat.hand.length !== 10) {
+        result = { error: "Invalid move: You must have exactly 10 cards to draw." };
+        break;
+      }
       result = applyDraw(room, seatIdx, parsed.data.source);
       break;
-    case "discard":
+    }
+    
+    case "discard": {
+      const seat = room.seats[seatIdx];
+      // FIX: Strict validation to prevent double-discards (9/12 card bug)
+      if (seat && seat.hand.length !== 11) {
+        result = { error: "Invalid move: You must have exactly 11 cards to discard." };
+        break;
+      }
       result = applyDiscard(room, seatIdx, parsed.data.cardId);
       break;
-    case "gin":
+    }
+    
+    case "gin": {
+      const seat = room.seats[seatIdx];
+      // FIX: Strict validation to ensure they drew before declaring Zhol
+      if (seat && seat.hand.length !== 11) {
+        result = { error: "Invalid move: You must have exactly 11 cards to declare Zhol." };
+        break;
+      }
       result = applyGin(room, seatIdx, parsed.data.cardId);
       break;
+    }
 
     case "pishpirik_play": {
       const cardId = parsed.data.cardId;
