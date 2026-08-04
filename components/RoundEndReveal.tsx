@@ -119,29 +119,16 @@ function DeadwoodRow({
 export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Props) {
   // 'smash' plays the impact animation, 'counting' shows the deadwood tally
   const [phase, setPhase] = useState<"smash" | "counting">("smash");
-  const [showButton, setShowButton] = useState(false);
 
   useEffect(() => {
     if (gameState.turnPhase === "round_over") {
       setPhase("smash");
-      setShowButton(false);
       
       // Transition from Smash to Counting after 2.5 seconds
       const t1 = setTimeout(() => setPhase("counting"), 2500); 
       return () => clearTimeout(t1);
     }
   }, [gameState.turnPhase]);
-
-  useEffect(() => {
-    if (phase === "counting" && gameState.lastRoundEnd) {
-      // Calculate how long the longest hand takes to count so the Next button fades in perfectly
-      const maxDeadCards = Math.max(...gameState.lastRoundEnd.pointsBySeat.map(p => p.deadCards?.length || 0));
-      const countingDuration = (maxDeadCards * 150) + 1200; // ms
-      
-      const t2 = setTimeout(() => setShowButton(true), countingDuration);
-      return () => clearTimeout(t2);
-    }
-  }, [phase, gameState.lastRoundEnd]);
 
   if (gameState.turnPhase !== "round_over" || !gameState.lastRoundEnd) return null;
 
@@ -225,22 +212,20 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
 
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: showButton ? 1 : 0 }}
+            animate={{ opacity: 1 }} // Instant visibility
             className="w-full"
           >
             {!gameState.matchOver ? (
               <button 
                 onClick={onNextRound}
-                disabled={!showButton}
-                className="w-full py-3.5 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] disabled:cursor-not-allowed"
+                className="w-full py-3.5 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] cursor-pointer"
               >
                 Start Next Round
               </button>
             ) : (
               <button 
                 onClick={onLeave}
-                disabled={!showButton}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(5,150,105,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(5,150,105,0.5)] cursor-pointer"
               >
                 Match Finished - Return to Lobby
               </button>
