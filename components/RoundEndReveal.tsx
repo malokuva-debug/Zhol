@@ -145,19 +145,39 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md">
       
       {phase === "smash" ? (
-        <div className="relative flex items-center justify-center w-full h-full overflow-hidden">
-          {/* 1. The Slamming Text */}
+        <div className="relative flex flex-col items-center justify-center w-full h-full overflow-hidden">
           <motion.div
             initial={{ scale: 4, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="absolute z-20 text-6xl md:text-8xl font-black text-white italic tracking-tighter text-center"
+            className="z-20 text-6xl md:text-8xl font-black text-white italic tracking-tighter text-center mb-8"
             style={{ textShadow: "0 0 30px #a35bff, 0 0 60px #a35bff" }}
           >
             {ginLabel}
           </motion.div>
 
-          {/* 2. The Scattered Cards (Force of the Gin) */}
+          {/* NEW: Winner's Hand Display */}
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="z-30 bg-black/60 p-6 rounded-2xl border border-white/10 backdrop-blur-md"
+          >
+            <h3 className="text-white font-bold mb-3 text-center uppercase tracking-widest text-sm text-neon-blue-soft">Winner's Hand</h3>
+            <div className="flex flex-wrap gap-4 justify-center">
+              {gameState.lastRoundEnd.winnerMelds?.map((meld, mIdx) => (
+                <div key={mIdx} className="flex -space-x-4 bg-white/5 p-2 rounded-xl border border-white/10">
+                  {meld.map((cardId, cIdx) => (
+                     <div key={cIdx} className="transform hover:-translate-y-2 transition-transform shadow-lg">
+                       <PlayingCard id={cardId} />
+                     </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Background Scattered Cards (Force of the Gin) */}
           {[...Array(20)].map((_, i) => (
             <motion.div
               key={i}
@@ -170,9 +190,8 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
                 scale: 0.5
               }}
               transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
-              className="absolute z-10 w-24 h-36 bg-white rounded-lg border-2 border-slate-300 shadow-2xl"
+              className="absolute z-10 w-24 h-36 bg-white rounded-lg border-2 border-slate-300 shadow-2xl pointer-events-none"
             >
-              {/* Fake card back pattern */}
               <div className="w-full h-full border-[6px] border-white bg-blue-600 rounded-sm opacity-50" />
             </motion.div>
           ))}
