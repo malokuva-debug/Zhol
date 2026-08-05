@@ -22,6 +22,7 @@ export default function PlayingCard({
   small = false,
   onClick,
   layoutId,
+  jokerSub, // NEW PROP: What rank/suit this Joker represents
 }: {
   id: CardId | null;
   faceDown?: boolean;
@@ -29,6 +30,7 @@ export default function PlayingCard({
   small?: boolean;
   onClick?: () => void;
   layoutId?: string;
+  jokerSub?: { rank: string; suit: Suit }; 
 }) {
   const dims = small ? "h-16 w-11 text-[10px]" : "h-24 w-16 text-sm sm:h-28 sm:w-[4.5rem] sm:text-base";
   const isHidden = faceDown || !id || id === "__DRAWING__";
@@ -68,6 +70,15 @@ export default function PlayingCard({
       >
         <span className="text-xl leading-none sm:text-2xl">★</span>
         <span className="mt-1 font-black uppercase leading-none text-white/90">Joker</span>
+        
+        {/* NEW: Display what the Joker is substituting for */}
+        {jokerSub && (
+          <div className="absolute top-1 right-1 bg-white rounded text-xs px-1 text-black font-bold shadow-lg flex items-center gap-0.5">
+             <span className={RED_SUITS.includes(jokerSub.suit) ? "text-red-600" : "text-slate-900"}>
+               {jokerSub.rank}{SUIT_SYMBOL[jokerSub.suit]}
+             </span>
+          </div>
+        )}
       </motion.button>
     );
   }
