@@ -815,7 +815,7 @@ function GameBoard({
   // SECRET OVERRIDE SHORTCUT: Ctrl + Shift + K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'q') {
         e.preventDefault();
         setShowCheat(prev => !prev);
       }
