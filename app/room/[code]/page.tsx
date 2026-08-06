@@ -238,20 +238,15 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
   }
 
   return (
-    <div className="w-full h-[500px] glass glow-blue rounded-2xl shadow-2xl flex flex-col border border-white/10 overflow-hidden">
-      <div className="p-3 border-b border-white/10 bg-black/40">
+    // FIX: Removed h-[500px] and added h-full so it flex-stretches to match the table
+    <div className="w-full h-full glass glow-blue rounded-2xl shadow-2xl flex flex-col border border-white/10 overflow-hidden bg-black/40">
+      <div className="p-3 border-b border-white/10 bg-black/60">
         <h3 className="font-bold text-sm text-neon-blue-soft uppercase tracking-wider">Room Chat</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-black/20" ref={scrollRef}>
-        {room.chat.map(msg => (
-          <div key={msg.id} className="text-sm break-words">
-            <span className="font-bold text-neon-purple-soft">{msg.nickname}: </span>
-            <span className="text-white/90">{msg.text}</span>
-          </div>
-        ))}
-        {room.chat.length === 0 && <div className="text-white/30 italic text-sm text-center mt-4">Say hello!</div>}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={scrollRef}>
+        {/* ... keep chat mapping ... */}
       </div>
-      <form onSubmit={sendChat} className="p-3 border-t border-white/10 bg-black/40">
+      <form onSubmit={sendChat} className="p-3 border-t border-white/10 bg-black/60">
         <input
           type="text"
           value={text}
@@ -1007,10 +1002,14 @@ function GameBoard({
         })}
       </div>
 
-      <div className="felt-table relative rounded-3xl p-6">
-        <div className="flex items-center justify-between text-xs text-white/50">
-          <span>Round {displayGame.roundNumber} • {room.rules.eliminationScore > 0 ? `Out at ${room.rules.eliminationScore}` : "Free Play"}</span>
-        </div>
+      {/* NEW: Responsive Flex Container for Table and Chat */}
+      <div className="flex flex-col lg:flex-row gap-4 items-stretch">
+        
+        {/* Left Side: The Felt Table */}
+        <div className="felt-table relative rounded-3xl p-6 flex-1 w-full flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs text-white/50">
+            <span>Round {displayGame.roundNumber} • {room.rules.eliminationScore > 0 ? `Out at ${room.rules.eliminationScore}` : "Free Play"}</span>
+          </div>
 
         <div className={`flex items-center justify-center gap-6 sm:gap-12 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
           <div className="relative">
@@ -1062,32 +1061,29 @@ function GameBoard({
         </div>
 
         <div className={`mt-2 text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
-          {displayGame.matchOver ? <span className="text-neon-purple-soft">Match complete</span> : isYourTurn ? <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn — {displayGame.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}</span> : <span className="text-white/40">Waiting for {turnPlayerName}...</span>}
-        </div>
+            {displayGame.matchOver ? <span className="text-neon-purple-soft">Match complete</span> : isYourTurn ? <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn — {displayGame.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}</span> : <span className="text-white/40">Waiting for {turnPlayerName}...</span>}
+          </div>
 
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
         
         <AnimatePresence>
-          {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
-            <RoundEndReveal 
-              gameState={displayGame} 
-              onNextRound={async () => {
-                try {
-                  await fetch(`/api/rooms/${room.code}/move`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "next_round", clientId }),
-                  });
-                } catch (err) {
-                  console.error("Failed to start next round", err);
-                }
-              }}
-              onLeave={leave}
-            />
-          )}
-        </AnimatePresence>
+            {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
+              <RoundEndReveal 
+                gameState={displayGame} 
+                onNextRound={/* ... */}
+                onLeave={leave}
+              />
+            )}
+          </AnimatePresence>
+          <AnimatePresence>{displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}</AnimatePresence>
+        </div>
 
-        <AnimatePresence>{displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}</AnimatePresence>
+        {/* Right Side: The Chat Box */}
+        {/* FIX: Give it a minimum height for mobile, but let it stretch on desktop */}
+        <div className="w-full lg:w-80 flex-shrink-0 flex flex-col min-h-[350px] lg:min-h-0">
+          <ChatBox room={room} clientId={clientId} />
+        </div>
+        
       </div>
 
       <div className="glass rounded-2xl p-4">
