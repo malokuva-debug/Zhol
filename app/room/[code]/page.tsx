@@ -170,44 +170,6 @@ export default function RoomPage() {
       <RoomHeader room={room} clientId={clientId} />
       
       {room.status === "waiting" && <WaitingRoom room={room} yourSeat={yourSeat} clientId={clientId} code={code} />}
-      
-      {room.status !== "waiting" && game && yourSeat !== null && (
-        <div className="flex flex-col lg:flex-row gap-6 mt-4 items-start">
-          {/* Static Chat Box on the Left */}
-          <div className="w-full lg:w-80 flex-shrink-0">
-            <ChatBox room={room} clientId={clientId} />
-          </div>
-
-          {/* Game Table on the Right */}
-          <div className="flex-1 w-full relative">
-            {gameMode === "cicmic" ? (
-              <CicmicBoard room={room} game={game} yourSeat={yourSeat} code={code} />
-            ) : gameMode === "pishpirik" ? (
-              <PishpirikBoard
-                room={room}
-                game={game}
-                yourSeat={yourSeat}
-                code={code}
-                selectedCard={selectedCard}
-                setSelectedCard={setSelectedCard}
-                actionError={actionError}
-                setActionError={setActionError}
-              />
-            ) : (
-              <GameBoard
-                room={room}
-                game={game}
-                yourSeat={yourSeat}
-                code={code}
-                selectedCard={selectedCard}
-                setSelectedCard={setSelectedCard}
-                actionError={actionError}
-                setActionError={setActionError}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </main>
   );
 }
