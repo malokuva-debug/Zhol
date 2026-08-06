@@ -204,8 +204,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             const rawPts = scorePishpirikCards(captured);
             const pishPts = room.game.pishpiriksBySeat[i] || 0;
             
-            // Raw points handles the standard card scores (so Jack on Jack = 2 pts). 
-            // pishPts handles the bonus (20 pts). Result is 22!
             const roundPoints = rawPts + pishPts; 
             room.seats[i]!.score += roundPoints;
 
@@ -217,17 +215,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             pointsBySeat.push({
                seatIdx: i,
                deadwood: roundPoints, // Re-using this UI property to show points earned
-               deadCards: [],
+               deadCards: captured, // FIX: Send captured cards to the UI so everyone can see them!
                melds: [],
                eliminated: false
             });
           }
 
           room.game.turnPhase = "round_over";
-          room.game.matchOver = true; 
-          room.game.matchWinnerIdx = winnerIdx;
+          
+          // FIX: Only end the MATCH if someone hit the score limit
+          if (room.rules.eliminationScore > 0 && highestScore >= room.rules.eliminationScore) {
+             room.game.matchOver = true; 
+             room.game.matchWinnerIdx = winnerIdx;
+          } else {
+             room.game.matchOver = false;
+          }
 
-          // Expose to the frontend to trigger the End Screen UI!
           room.game.lastRoundEnd = {
             type: "PISHPIRIK",
             winnerIdx: winnerIdx,
