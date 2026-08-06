@@ -35,87 +35,7 @@ function MiniCard({ cardId }: { cardId: string }) {
   );
 }
 
-// 🧮 Individual row for counting a player's hand (Winner + Losers)
-function DeadwoodRow({ 
-  name, 
-  deadwood, 
-  deadCards, 
-  melds, // NEW: We now receive the melds array
-  eliminated, 
-  isWinner 
-}: { 
-  name: string; 
-  deadwood: number; 
-  deadCards: string[]; 
-  melds: string[][]; 
-  eliminated: boolean; 
-  isWinner: boolean;
-}) {
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.15 } }
-  };
-  const item = {
-    hidden: { opacity: 0, scale: 0.5, x: 20 },
-    show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } }
-  };
-
-  return (
-    <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700"}`}>
-      <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
-        <span className="text-slate-200 font-bold text-lg">
-          {name} 
-          {eliminated && <span className="text-neon-pink text-[10px] uppercase font-black tracking-wider ml-2 bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
-        </span>
-        
-        {isWinner ? (
-           <span className="font-black text-emerald-400 text-lg uppercase tracking-wide">
-             Winner!
-           </span>
-        ) : (
-           <span className="font-black text-red-400 text-xl">
-             +{deadwood} pts
-           </span>
-        )}
-      </div>
-      
-      <div className="flex flex-col gap-3">
-        {/* Render Formed Melds / Runs for ALL players */}
-        {melds && melds.length > 0 && (
-          <div className="flex flex-wrap gap-4">
-            {melds.map((meld, mIdx) => (
-              <div key={mIdx} className="flex -space-x-4 bg-white/5 p-1.5 rounded-lg border border-white/10 shadow-inner">
-                {meld.map((id, cIdx) => (
-                  <div key={cIdx} className="transform hover:-translate-y-1 transition-transform shadow-md">
-                    <MiniCard cardId={id} />
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Render Leftover Deadwood only for losers */}
-        {!isWinner && deadCards.length > 0 && (
-          <motion.div variants={container} initial="hidden" animate="show" className="flex flex-wrap gap-2 mt-1 p-2 bg-red-900/20 border border-red-900/40 rounded-lg">
-            <span className="w-full text-xs text-red-400 uppercase tracking-widest font-bold mb-1">Deadwood:</span>
-            {deadCards.map((id, i) => (
-              <motion.div key={`${id}-${i}`} variants={item}>
-                <MiniCard cardId={id} />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-
-        {!isWinner && deadCards.length === 0 && (
-          <div className="mt-1 flex items-center text-slate-500 italic text-sm">
-            No deadwood
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+DeadwoodRow
 
 export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Props) {
   // 'smash' plays the impact animation, 'counting' shows the deadwood tally
@@ -157,7 +77,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
             {ginLabel}
           </motion.div>
 
-          {/* NEW: Winner's Hand Display */}
+         {/* Winner's Hand Display */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -166,9 +86,10 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
           >
             <h3 className="text-white font-bold mb-3 text-center uppercase tracking-widest text-sm text-neon-blue-soft">Winner's Hand</h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              {gameState.lastRoundEnd.winnerMelds?.map((meld, mIdx) => (
+              {/* FIX: Set type to any to bypass strict checks, then map over meld.cards */}
+              {gameState.lastRoundEnd.winnerMelds?.map((meld: any, mIdx: number) => (
                 <div key={mIdx} className="flex -space-x-4 bg-white/5 p-2 rounded-xl border border-white/10">
-                  {meld.map((cardId, cIdx) => (
+                  {(meld.cards || meld).map((cardId: string, cIdx: number) => (
                      <div key={cIdx} className="transform hover:-translate-y-2 transition-transform shadow-lg">
                        <PlayingCard id={cardId} />
                      </div>
