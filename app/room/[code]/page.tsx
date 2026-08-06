@@ -1394,10 +1394,10 @@ function GameBoard({
 // SHARED UTILITIES
 // ----------------------------------------------------------------------
 
-function seatPosition(index: number, opponentCount: number): { x: number; y: number } {
-  const totalSeats = opponentCount + 1;
+function seatPosition(visualIndex: number, totalOpponentSeats: number): { x: number; y: number } {
+  const totalSeats = totalOpponentSeats + 1;
   const angleStep = 360 / totalSeats;
-  const angleDeg = 90 + angleStep * (index + 1);
+  const angleDeg = 90 + angleStep * (visualIndex + 1);
   const rad = (angleDeg * Math.PI) / 180;
   return { x: 50 + 42 * Math.cos(rad), y: 50 + 40 * Math.sin(rad) };
 }
@@ -1409,7 +1409,7 @@ const ActionButton = forwardRef<HTMLButtonElement, { children: React.ReactNode; 
 ActionButton.displayName = "ActionButton";
 
 function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn, faceDown, team }: { nickname: string; connected: boolean; cardCount: number; score: number; eliminated: boolean; isTurn: boolean; faceDown?: boolean; team?: 1 | 2; }) {
-  // NEW: Thicker colored left border if they are on a team
+  // Thicker colored left border if they are on a team
   const teamStyle = team === 1 
     ? "border-l-4 border-l-neon-blue shadow-[inset_4px_0_10px_rgba(77,216,255,0.1)]" 
     : team === 2 
@@ -1422,7 +1422,7 @@ function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
         
-        {/* NEW: Team Labels */}
+        {/* Team Labels */}
         {team === 1 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-blue/20 text-neon-blue-soft px-1.5 py-0.5 rounded">Team 1</span>}
         {team === 2 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-pink/20 text-neon-pink px-1.5 py-0.5 rounded">Team 2</span>}
         
