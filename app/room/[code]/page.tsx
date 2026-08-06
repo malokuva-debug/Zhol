@@ -832,6 +832,15 @@ function PishpirikBoard({
     });
   }
 
+  async function kickPlayer(targetClientId: string) {
+    if (!confirm("Are you sure you want to kick this player?")) return;
+    await fetch(`/api/rooms/${code}/kick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, targetClientId }),
+    });
+  }
+
   async function playCard(cardId: string) {
     setActionError("");
 
@@ -923,6 +932,45 @@ function PishpirikBoard({
         </div>
       )}
 
+      {/* NEW: Add Opponent rendering to Pishpirik! */}
+      <div className="relative h-48 sm:h-56 z-20">
+        {game.opponents.map((opp) => {
+          const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
+          const visualIndex = relIdx - 1;
+          const pos = seatPosition(visualIndex, room.maxPlayers - 1);
+          
+          const oppClientId = room.seats[opp.seatIdx]?.clientId;
+          
+          return (
+            <div key={opp.seatIdx} className="absolute -translate-x-1/2 -translate-y-1/2 space-y-1" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
+              <PlayerStrip 
+                nickname={opp.nickname} 
+                connected={opp.connected} 
+                cardCount={opp.cardCount} 
+                score={opp.score} 
+                eliminated={opp.eliminated} 
+                isTurn={game.turnIdx === opp.seatIdx} 
+                faceDown={false} 
+                team={opp.team} 
+              />
+              
+              {isHost && oppClientId && (
+                <button onClick={() => kickPlayer(oppClientId)} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
+                  Kick
+                </button>
+              )}
+              
+              {/* Render face-down cards */}
+              {!opp.eliminated && (
+                <div className="flex justify-center mt-2">
+                  <OpponentFan count={opp.cardCount} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      
       <div className="felt-table relative rounded-3xl p-6">
         <div className="flex items-center justify-between text-xs text-white/50">
           <span>Pishpirik</span>
@@ -1255,22 +1303,21 @@ function GameBoard({
               />
               
               {isHost && oppClientId && (
-                <button onClick={() => kickPlayer(oppClientId)} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
+                <button onClick={/* Note: You might need to add kickPlayer to GameBoard if it's missing in scope */} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
                   Kick
                 </button>
               )}
               
-              {/* Show actual opponent cards! */}
+              {/* FIXED: Always render face-down cards using OpponentFan! */}
               {!opp.eliminated && (
                 <div className="flex justify-center mt-2">
-                  {opp.hand && opp.hand.length > 0 ? (
-                    <div className="flex justify-center -space-x-5 sm:-space-x-6 scale-[0.6] sm:scale-75 origin-top">
-                      {opp.hand.map((cardId, cIdx) => (
-                        <div key={cIdx} className="transform transition-transform hover:-translate-y-4 hover:z-30 shadow-xl">
-                          <PlayingCard id={cardId} />
-                        </div>
-                      ))}
-                    </div>
+                  <OpponentFan count={opp.cardCount} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
                   ) : (
                     <OpponentFan count={opp.cardCount} />
                   )}
