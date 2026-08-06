@@ -456,13 +456,16 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   room.seats.forEach((seat, i) => {
     if (!seat || seat.eliminated) return;
 
+    // NEW: Calculate deadwood and melds for EVERY player (including the winner)
+    const res = minimizeDeadwood(seat.hand);
+    
     let deadwood = 0;
     let deadCards: string[] = [];
 
     if (i === seatIdx) {
       seat.score -= winBonus;
+      // Winner has no deadwood points, but we still want to grab their `res.melds`
     } else {
-      const res = minimizeDeadwood(seat.hand);
       deadwood = res.deadwood;
       deadCards = res.deadCards;
       seat.score += deadwood;
@@ -477,6 +480,7 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
       seatIdx: i,
       deadwood,
       deadCards,
+      melds: res.melds, // NEW: Export the grouped melds for the UI
       eliminated: seat.eliminated
     });
   });
