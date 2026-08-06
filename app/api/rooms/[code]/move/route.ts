@@ -120,7 +120,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       break;
     }
 
+    // Inside app/api/rooms/[code]/move/route.ts under case "pishpirik_play":
+
     case "pishpirik_play": {
+      enforceTeamAssignments(room);
       const cardId = parsed.data.cardId;
       const seat = room.seats[seatIdx];
 
@@ -133,53 +136,41 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       
       const { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
 
-      const is2v2 = room.rules.teamMode === "2v2";
-      const myTeam = room.seats[seatIdx]?.team;
+      const is2v2 = room.rules.gameMode === "pishpirik" && room.maxPlayers === 4;
+      const myTeam = room.seats[seatIdx]?.team ?? (seatIdx % 2 === 0 ? 1 : 2);
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
 
+      // Shared Team Graveyard Key: Team 1 uses key 0, Team 2 uses key 1
+      const teamGraveyardKey = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
+
       if (captures) {
         const eaten = [...tablePile, cardId];
-        
-        // --------------------------------------------------------
-        // SHARED GRAVEYARD FIX:
-        // Unify graveyard: Team 1 captures go to seat 0, Team 2 captures go to seat 1.
-        // --------------------------------------------------------
-        const targetIdx = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
-
-        room.game.capturedBySeat[targetIdx] = [
-          ...(room.game.capturedBySeat[targetIdx] || []),
+        room.game.capturedBySeat[teamGraveyardKey] = [
+          ...(room.game.capturedBySeat[teamGraveyardKey] || []),
           ...eaten
         ];
         room.game.tablePile = [];
-        room.game.lastCaptureIdx = targetIdx;
+        room.game.lastCaptureIdx = seatIdx;
 
         if (isPishpirik) {
           const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
-          
-          // Find the enemy's primary index for cancellation
-          let enemyTargetIdx: number | undefined;
-          
-          if (is2v2) {
-            enemyTargetIdx = myTeam === 1 ? 1 : 0;
-          } else {
-            enemyTargetIdx = activeSeats.find((i) => i !== seatIdx && (pishMap[i] || 0) > 0);
-          }
+          const enemyKey = is2v2 ? (myTeam === 1 ? 1 : 0) : activeSeats.find(i => i !== seatIdx && (pishMap[i] || 0) > 0);
 
-          if (enemyTargetIdx !== undefined && (pishMap[enemyTargetIdx] || 0) > 0) {
-             const enemyCurrent = pishMap[enemyTargetIdx];
-             if (enemyCurrent > pishPts) {
-                 pishMap[enemyTargetIdx] -= pishPts;
-             } else if (enemyCurrent < pishPts) {
-                 pishMap[enemyTargetIdx] = 0;
-                 pishMap[targetIdx] = (pishMap[targetIdx] || 0) + (pishPts - enemyCurrent);
-             } else {
-                 pishMap[enemyTargetIdx] = 0;
-             }
+          if (enemyKey !== undefined && (pishMap[enemyKey] || 0) > 0) {
+            const enemyCurrent = pishMap[enemyKey];
+            if (enemyCurrent > pishPts) {
+              pishMap[enemyKey] -= pishPts;
+            } else if (enemyCurrent < pishPts) {
+              pishMap[enemyKey] = 0;
+              pishMap[teamGraveyardKey] = (pishMap[teamGraveyardKey] || 0) + (pishPts - enemyCurrent);
+            } else {
+              pishMap[enemyKey] = 0;
+            }
           } else {
-            pishMap[targetIdx] = (pishMap[targetIdx] || 0) + pishPts;
+            pishMap[teamGraveyardKey] = (pishMap[teamGraveyardKey] || 0) + pishPts;
           }
         }
       } else {
@@ -194,76 +185,51 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.seats[i]!.hand = room.game.deck.splice(0, 4);
           }
         } else {
+          // Sweep remaining table pile to team that made the last capture
           if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
-            const remaining = room.game.tablePile;
-            room.game.capturedBySeat[room.game.lastCaptureIdx] = [
-              ...(room.game.capturedBySeat[room.game.lastCaptureIdx] || []),
-              ...remaining,
+            const lastTeam = room.seats[room.game.lastCaptureIdx]?.team ?? (room.game.lastCaptureIdx % 2 === 0 ? 1 : 2);
+            const sweepKey = is2v2 ? (lastTeam === 1 ? 0 : 1) : room.game.lastCaptureIdx;
+            room.game.capturedBySeat[sweepKey] = [
+              ...(room.game.capturedBySeat[sweepKey] || []),
+              ...room.game.tablePile,
             ];
             room.game.tablePile = [];
           }
 
-          // 1. Calculate individual round points
-          const individualRoundPoints: Record<number, number> = {};
-          for (const i of activeSeats) {
-             const captured = room.game.capturedBySeat[i] || [];
-             individualRoundPoints[i] = scorePishpirikCards(captured) + (room.game.pishpiriksBySeat[i] || 0);
-          }
+          // Calculate Team Round Points
+          if (is2v2) {
+            const team1Captured = room.game.capturedBySeat[0] || [];
+            const team2Captured = room.game.capturedBySeat[1] || [];
 
-          // 2. Synchronize the team scores internally
-          for (const i of activeSeats) {
-             let pointsToAdd = individualRoundPoints[i];
-             
-             if (is2v2) {
-                 const t = room.seats[i]?.team;
-                 // Sum the points of EVERYONE on this team
-                 pointsToAdd = activeSeats
-                     .filter(idx => room.seats[idx]?.team === t)
-                     .reduce((sum, idx) => sum + individualRoundPoints[idx], 0);
-             }
-             
-             room.seats[i]!.score += pointsToAdd; 
-          }
+            const team1Pts = scorePishpirikCards(team1Captured) + (room.game.pishpiriksBySeat[0] || 0);
+            const team2Pts = scorePishpirikCards(team2Captured) + (room.game.pishpiriksBySeat[1] || 0);
 
-          let highestScore = -1;
-          let winnerIdx = seatIdx;
-          const pointsBySeat = [];
-
-          for (const i of activeSeats) {
-            if (room.seats[i]!.score > highestScore) {
-              highestScore = room.seats[i]!.score;
-              winnerIdx = i;
-            }
-
-            // We still send the individual captures down so the UI can group them properly!
-            pointsBySeat.push({
-               seatIdx: i,
-               deadwood: individualRoundPoints[i], 
-               deadCards: room.game.capturedBySeat[i] || [], 
-               melds: [],
-               eliminated: false,
-               team: room.seats[i]?.team
+            // Add team points to both members of each team
+            room.seats.forEach((s, idx) => {
+              if (s) {
+                const t = s.team ?? (idx % 2 === 0 ? 1 : 2);
+                s.score += (t === 1 ? team1Pts : team2Pts);
+              }
             });
+
+            const pointsBySeat = room.seats.map((s, idx) => ({
+              seatIdx: idx,
+              deadwood: s ? (s.team === 1 ? team1Pts : team2Pts) : 0,
+              deadCards: s ? (s.team === 1 ? team1Captured : team2Captured) : [],
+              melds: [],
+              eliminated: false,
+              team: s?.team
+            }));
+
+            const winnerIdx = team1Pts >= team2Pts ? 0 : 1;
+            room.game.turnPhase = "round_over";
+            room.game.lastRoundEnd = {
+              type: "PISHPIRIK",
+              winnerIdx,
+              winnerBonus: 0,
+              pointsBySeat
+            };
           }
-
-          room.game.turnPhase = "round_over";
-          
-          const isFreePlay = !room.rules.allowEliminations || room.rules.eliminationScore <= 0;
-          const reachedScoreLimit = highestScore >= room.rules.eliminationScore;
-
-          if (isFreePlay || reachedScoreLimit) {
-             room.game.matchOver = true; 
-             room.game.matchWinnerIdx = winnerIdx;
-          } else {
-             room.game.matchOver = false;
-          }
-
-          room.game.lastRoundEnd = {
-            type: "PISHPIRIK",
-            winnerIdx: winnerIdx,
-            winnerBonus: 0,
-            pointsBySeat
-          };
         }
       }
 
@@ -274,7 +240,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       result = { ok: true };
       break;
     }
-
     // ... Cicmic cases remain identical
     case "cicmic_place": { /* omitted for brevity, keeping original logic below */
       const board = room.game.board || {};
