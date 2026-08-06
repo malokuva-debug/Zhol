@@ -43,7 +43,8 @@ function DeadwoodRow({
   deadCards, 
   melds, 
   eliminated, 
-  isWinner 
+  isWinner,
+  isPishpirikGame // NEW PROP
 }: { 
   name: string; 
   deadwood: number; 
@@ -51,15 +52,14 @@ function DeadwoodRow({
   melds: any[]; 
   eliminated: boolean; 
   isWinner: boolean;
+  isPishpirikGame?: boolean;
 }) {
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.15 } }
-  };
-  const item = {
-    hidden: { opacity: 0, scale: 0.5, x: 20 },
-    show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } }
-  };
+  const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+  const item = { hidden: { opacity: 0, scale: 0.5, x: 20 }, show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } } };
+
+  // FIX: In Pishpirik, everyone shows their captured cards. In Zhol, only losers show deadwood.
+  const showCards = isPishpirikGame ? deadCards.length > 0 : (!isWinner && deadCards.length > 0);
+  const cardsLabel = isPishpirikGame ? "Captured Cards:" : "Deadwood:";
 
   return (
     <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700"}`}>
@@ -71,7 +71,7 @@ function DeadwoodRow({
         
         {isWinner ? (
            <span className="font-black text-emerald-400 text-lg uppercase tracking-wide">
-             Winner!
+             {isPishpirikGame ? `${deadwood} pts (Round Winner)` : "Winner!"}
            </span>
         ) : (
            <span className="font-black text-red-400 text-xl">
@@ -95,6 +95,21 @@ function DeadwoodRow({
             ))}
           </div>
         )}
+
+        {showCards && (
+          <motion.div variants={container} initial="hidden" animate="show" className={`flex flex-wrap gap-2 mt-1 p-2 border rounded-lg ${isPishpirikGame ? 'bg-blue-900/20 border-blue-900/40' : 'bg-red-900/20 border-red-900/40'}`}>
+            <span className={`w-full text-xs uppercase tracking-widest font-bold mb-1 ${isPishpirikGame ? 'text-blue-400' : 'text-red-400'}`}>{cardsLabel}</span>
+            {deadCards.map((id, i) => (
+              <motion.div key={`${id}-${i}`} variants={item}>
+                <MiniCard cardId={id} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
         
         {/* Render Leftover Deadwood only for losers */}
         {!isWinner && deadCards.length > 0 && (
