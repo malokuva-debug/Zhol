@@ -8,7 +8,7 @@ import { useLiveData } from "@/lib/use-live-data";
 import { roomChannel, EVENTS } from "@/lib/pusher";
 import type { Room, ClientGameState } from "@/lib/types";
 import { minimizeDeadwood, canGin, isJokerId, makeCard } from "@/lib/gin-engine";
-import PlayingCard from "@/components/PlayingCard";
+import PlayingCard, { parseCardId } from "@/components/PlayingCard";
 import CheatManager from "@/components/CheatManager";
 import HandFan from "@/components/HandFan";
 import OpponentFan from "@/components/OpponentFan";
@@ -722,9 +722,23 @@ function PishpirikBoard({
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
   const canAct = isYourTurn && game.turnPhase === "discard";
   const tablePile = game.tablePile || [];
+  
+  const [showSkull, setShowSkull] = useState(false);
+  const [showGraveyard, setShowGraveyard] = useState(false);
+
+  const myCaptured = game.capturedBySeat?.[yourSeat] || [];
+  const myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
 
   async function playCard(cardId: string) {
     setActionError("");
+
+    // Detect if we are playing a Jack on an empty table to show the Ghost Skull
+    const { rank } = parseCardId(cardId);
+    if (rank === "J" && tablePile.length === 0) {
+      setShowSkull(true);
+      setTimeout(() => setShowSkull(false), 2000);
+    }
+
     const res = await fetch(`/api/rooms/${code}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -735,11 +749,75 @@ function PishpirikBoard({
   }
 
   return (
-    <div className="relative space-y-4">
+    <div className="relative space-y-4 w-full">
+      {/* 👻 Ghost Skull Animation */}
+      <AnimatePresence>
+        {showSkull && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.5 }}
+            animate={{ opacity: 1, y: -250, scale: 2 }}
+            exit={{ opacity: 0, scale: 1.5 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[150] pointer-events-none"
+          >
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="#a35bff" className="drop-shadow-[0_0_25px_#ff5bc8]">
+              <path d="M12 2C7.58 2 4 5.58 4 10v9.5c0 .63.68 1.01 1.22.68L7 19l2.28 1.37c.43.26.97.26 1.41 0L13 19l2.28 1.37c.43.26.97.26 1.41 0L19 19l1.78 1.18c.54.33 1.22-.05 1.22-.68V10c0-4.42-3.58-8-8-8zm-3 9c-.83 0-1.5-.67-1.5-1.5S8.17 8 9 8s1.5.67 1.5 1.5S9.83 11 9 11zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 8 15 8s1.5.67 1.5 1.5S15.83 11 15 11z"/>
+            </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 🪦 Graveyard Modal */}
+      {showGraveyard && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowGraveyard(false)}>
+           <div className="bg-slate-900 border border-neon-purple p-6 rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-[0_0_30px_rgba(163,91,255,0.3)] mx-4" onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <h2 className="text-2xl font-black text-neon-blue-soft uppercase tracking-wider">Captured Cards</h2>
+                <button className="text-white/50 hover:text-white" onClick={() => setShowGraveyard(false)}>✕</button>
+              </div>
+              
+              {myPishPts > 0 && (
+                <div className="bg-neon-pink/20 border border-neon-pink/40 text-neon-pink px-4 py-2 rounded-lg font-bold mb-6 flex justify-between">
+                  <span>Pishpirik Points Earned:</span>
+                  <span className="text-xl">+{myPishPts}</span>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                 {myCaptured.length > 0 ? (
+                   myCaptured.map(id => <PlayingCard key={id} id={id} small />)
+                 ) : (
+                   <p className="text-white/40 italic w-full text-center py-8">You haven't captured any cards yet.</p>
+                 )}
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className="felt-table relative rounded-3xl p-6">
         <div className="flex items-center justify-between text-xs text-white/50">
           <span>Pishpirik</span>
           <span className="text-white/30">{tablePile.length === 0 ? "Table empty" : `Pile: ${tablePile.length} card${tablePile.length === 1 ? "" : "s"}`}</span>
+        </div>
+
+        {/* NEW: Deck Count */}
+        <div className="absolute right-4 top-4 text-xs font-bold text-white/50 bg-black/30 px-3 py-1.5 rounded-full border border-white/5 z-10">
+           Deck: {game.deck.length}
+        </div>
+
+        {/* NEW: Captured Cards Button */}
+        <div className="absolute left-4 top-4 z-10">
+           {myCaptured.length > 0 && (
+             <button onClick={() => setShowGraveyard(true)} className="flex flex-col items-center group">
+               <div className="relative h-16 w-11 rounded border border-white/20 shadow-md transition-transform group-hover:-translate-y-1">
+                 <PlayingCard id={null} faceDown small />
+                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded backdrop-blur-[1px]">
+                   <span className="text-white font-black text-sm">+{myCaptured.length}</span>
+                 </div>
+               </div>
+               <span className="text-[10px] uppercase font-bold text-white/50 mt-1">View</span>
+             </button>
+           )}
         </div>
 
         <div className="flex items-center justify-center py-16">
@@ -758,20 +836,39 @@ function PishpirikBoard({
                   <PlayingCard id={id} />
                 </motion.div>
               ))}
-              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-wider text-white/30 whitespace-nowrap">
-                {tablePile.length} card{tablePile.length === 1 ? "" : "s"} in pile
-              </span>
             </div>
           )}
         </div>
+        
         <div className="text-center text-sm font-semibold mt-6">
-          {isYourTurn ? (
+          {game.matchOver ? (
+             <span className="text-neon-purple-soft">Match complete</span> 
+          ) : isYourTurn ? (
             <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn — Play a card</span>
           ) : (
             <span className="text-white/40">Waiting...</span>
           )}
         </div>
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
+
+        {/* FIX: Add the missing Round End Component! */}
+        <AnimatePresence>
+          {game.turnPhase === "round_over" && game.lastRoundEnd && (
+            <RoundEndReveal 
+              gameState={game} 
+              onNextRound={() => {}} // Pishpirik currently ends the match completely
+              onLeave={async () => {
+                removeRecentRoom(code);
+                await fetch(`/api/rooms/${code}/leave`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ clientId: getClientId() }),
+                });
+                window.location.href = "/lobby";
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="glass rounded-2xl p-4">
@@ -781,7 +878,7 @@ function PishpirikBoard({
             Play Selected Card
           </button>
         </div>
-        <HandFan cards={game.yourHand} selectedCard={selectedCard} onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} interactive={canAct} />
+        <HandFan cards={game.matchOver ? [] : game.yourHand} selectedCard={selectedCard} onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} interactive={canAct && !game.matchOver} />
       </div>
     </div>
   );
