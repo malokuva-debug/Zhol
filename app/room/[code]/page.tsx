@@ -211,17 +211,21 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // GUARANTEE we have an array to map over, even if the server sends undefined
+  const chatMessages = room.chat || [];
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [room.chat]);
+  }, [chatMessages]);
 
   async function sendChat(e: React.FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
     const msg = text;
-    setText("");
+    setText(""); // clear input instantly
+    
     await fetch(`/api/rooms/${room.code}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -230,14 +234,23 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
   }
 
   return (
-    // FIX: Removed h-[500px] and added h-full so it flex-stretches to match the table
     <div className="w-full h-full glass glow-blue rounded-2xl shadow-2xl flex flex-col border border-white/10 overflow-hidden bg-black/40">
       <div className="p-3 border-b border-white/10 bg-black/60">
         <h3 className="font-bold text-sm text-neon-blue-soft uppercase tracking-wider">Room Chat</h3>
       </div>
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={scrollRef}>
-        {/* ... keep chat mapping ... */}
+        {chatMessages.map((msg: any) => (
+          <div key={msg.id} className="text-sm break-words">
+            <span className="font-bold text-neon-purple-soft">{msg.nickname}: </span>
+            <span className="text-white/90">{msg.text}</span>
+          </div>
+        ))}
+        {chatMessages.length === 0 && (
+          <div className="text-white/30 italic text-sm text-center mt-4">Say hello!</div>
+        )}
       </div>
+
       <form onSubmit={sendChat} className="p-3 border-t border-white/10 bg-black/60">
         <input
           type="text"
@@ -251,7 +264,6 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
     </div>
   );
 }
-
 // ----------------------------------------------------------------------
 // HEADER & WAITING ROOM
 // ----------------------------------------------------------------------
