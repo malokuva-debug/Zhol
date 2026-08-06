@@ -267,6 +267,7 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
         nickname: s.nickname,
         connected: s.connected,
         cardCount: s.hand.length,
+        hand: s.hand, // <--- ADD THIS LINE TO SEND THE CARDS
         score: s.score,
         eliminated: s.eliminated,
         team: s.team,
