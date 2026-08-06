@@ -160,12 +160,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
         if (isPishpirik) {
           // FIX: Take down the enemy's pishpirik if they have one. Otherwise count for us.
-          const enemyIdx = activeSeats.find(i => i !== seatIdx && (room.game.pishpiriksBySeat[i] || 0) > 0);
+          const enemyIdx = activeSeats.find(i => i !== seatIdx && (room.game!.pishpiriksBySeat[i] || 0) > 0);
           
           if (enemyIdx !== undefined) {
-            room.game.pishpiriksBySeat[enemyIdx] -= 1; // Cancel theirs out
+            room.game!.pishpiriksBySeat[enemyIdx] -= 1; // Cancel theirs out
           } else {
-            room.game.pishpiriksBySeat[seatIdx] = (room.game.pishpiriksBySeat[seatIdx] || 0) + 1; // Keep ours
+            room.game!.pishpiriksBySeat[seatIdx] = (room.game!.pishpiriksBySeat[seatIdx] || 0) + 1; // Keep ours
           }
         }
       } else {
