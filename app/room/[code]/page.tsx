@@ -1291,10 +1291,11 @@ function GameBoard({
           {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
           
           <AnimatePresence>
-            {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
-              <RoundEndReveal 
-                gameState={displayGame} 
-                isHost={isHost}
+          {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
+            <RoundEndReveal 
+              room={room} /* <--- ADD THIS LINE */
+              gameState={displayGame} 
+              isHost={isHost}
                 onNextRound={async () => {
                   try {
                     await fetch(`/api/rooms/${code}/move`, {
