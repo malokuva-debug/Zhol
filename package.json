@@ -1,8 +1,8 @@
 {
-  "name": "zhol-multiplayer",
+  "name": "shuffle-kosova",
   "version": "1.0.0",
   "private": true,
-  "description": "Kosovo-style Zhol (Gin Rummy) — real-time multiplayer, no login required.",
+  "description": "Kosovo-style Card/Board Games — real-time multiplayer, no login required.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
