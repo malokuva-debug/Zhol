@@ -68,6 +68,26 @@ export function addSystemMessage(room: Room, msg: string) {
   room.updatedAt = Date.now();
 }
 
+export function addChatMessage(room: Room, clientId: string, text: string) {
+  const seat = room.seats.find((s) => s?.clientId === clientId);
+  if (!seat) return { error: "Player not found." };
+
+  room.chat.push({
+    id: Math.random().toString(36).substring(2, 10),
+    nickname: seat.nickname,
+    text: text.slice(0, 150), // keep it within our 150 char limit
+    timestamp: Date.now(),
+  });
+
+  // Keep only the latest 50 messages so the room state doesn't get too large
+  if (room.chat.length > 50) {
+    room.chat.shift();
+  }
+  
+  room.updatedAt = Date.now();
+  return { ok: true };
+}
+
 export function tryJoinRoom(
   room: Room,
   nickname: string,
