@@ -198,6 +198,26 @@ export function initializeGame(room: Room) {
     return;
   }
 
+  export function restartMatch(room: Room) {
+  room.seats.forEach((seat) => {
+    if (seat) {
+      seat.score = 0;
+      seat.eliminated = false;
+      seat.hand = [];
+    }
+  });
+  
+  if (room.game) {
+    room.game.matchOver = false;
+    room.game.matchWinnerIdx = undefined;
+    room.game.lastRoundEnd = undefined;
+  }
+
+  // Re-deal and reset all state for round 1
+  initializeGame(room);
+  addSystemMessage(room, "The match was restarted by the host.");
+}
+
   if (mode === "pishpirik") {
     const deck = generateStandardDeck();
     shuffle(deck);
