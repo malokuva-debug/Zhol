@@ -59,16 +59,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
   // FIX: Handled properly and defensively mapped for older rooms
   if (parsed.data.action === "chat") {
-    if (!room.chat) room.chat = []; // Safe fallback for rooms generated before chat existed
+    const seat = room.seats[seatIdx];
     
-    const result = addChatMessage(room, parsed.data.clientId, parsed.data.text);
-    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+    // 1. GUARANTEE the chat array exists before pushing
+    if (!room.chat) {
+      room.chat = [];
+    }
 
+    if (seat && parsed.data.text.trim().length > 0) {
+      room.chat.push({
+        id: Math.random().toString(36).substring(2, 10),
+        kind: "chat",
+        nickname: seat.nickname,
+        text: parsed.data.text.slice(0, 150).trim(),
+        at: Date.now()
+      });
+      
+      // Keep only the latest 50 messages
+      if (room.chat.length > 50) {
+        room.chat.shift();
+      }
+    }
+    
     await saveRoom(room);
     await publishRoomUpdate(room.code);
     return NextResponse.json({ ok: true });
   }
-
   // --- GAMEPLAY MOVES (Requires it to be your turn) ---
 
   if (room.game.turnIdx !== seatIdx) {
