@@ -955,10 +955,13 @@ function PishpirikBoard({
               />
               
               {isHost && oppClientId && (
-                <button onClick={() => kickPlayer(oppClientId)} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
-                  Kick
-                </button>
-              )}
+  <button 
+    onClick={() => kickPlayer(oppClientId)} 
+    className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
+  >
+    Kick
+  </button>
+)}
               
               {/* Render face-down cards */}
               {!opp.eliminated && (
