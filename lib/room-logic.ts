@@ -100,8 +100,8 @@ export function tryJoinRoom(
     return { ok: false, error: "Room is full." };
   }
 
-  // Inside tryJoinRoom in lib/room-logic.ts
-
+  // Automatically assign team for 2v2 mode
+  // Teams sit across: Team 1 = seats 0,2 | Team 2 = seats 1,3
   room.seats[freeIdx] = {
     nickname,
     clientId,
@@ -111,7 +111,6 @@ export function tryJoinRoom(
     hand: [],
     score: 0,
     eliminated: false,
-    // FIX: Automatically assign team based on alternating seats for 2v2
     team: room.rules.teamMode === "2v2" ? (freeIdx % 2 === 0 ? 1 : 2) : undefined,
   };
 
@@ -267,7 +266,7 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
         nickname: s.nickname,
         connected: s.connected,
         cardCount: s.hand.length,
-        hand: s.hand, // <--- ADD THIS LINE! This physically sends the cards to the UI
+        // DO NOT SEND: hand: s.hand - this would reveal opponent cards!
         score: s.score,
         eliminated: s.eliminated,
         team: s.team,
@@ -375,6 +374,7 @@ export function startNextRound(room: Room) {
   if (!room.game) return;
 
   const mode = room.rules.gameMode;
+  const is2v2 = room.rules.teamMode === "2v2";
   const activeSeats = room.seats
     .map((s, i) => (s && !s.eliminated ? i : -1))
     .filter((i) => i !== -1);
@@ -386,6 +386,7 @@ export function startNextRound(room: Room) {
     let starterSeat = activeSeats[0];
     const prevStarter = room.game.dealerIdx ?? activeSeats[0];
     
+    // For 2v2, rotate starter to the next player clockwise
     for (let i = 1; i <= room.seats.length; i++) {
       const candidate = (prevStarter + i) % room.seats.length;
       if (activeSeats.includes(candidate)) {
@@ -429,6 +430,7 @@ export function startNextRound(room: Room) {
     let starterSeat = activeSeats[0];
     const prevStarter = room.game.dealerIdx ?? activeSeats[0];
     
+    // Rotate starter clockwise to the next player
     for (let i = 1; i <= room.seats.length; i++) {
       const candidate = (prevStarter + i) % room.seats.length;
       if (activeSeats.includes(candidate)) {
