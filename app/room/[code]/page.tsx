@@ -336,7 +336,7 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 
   const [draggedSeat, setDraggedSeat] = useState<number | null>(null);
 
-  const is2v2 = room.rules.teamMode === "2v2" && room.maxPlayers === 4;
+  const is2v2 = (room.rules.teamMode === "2v2" || room.rules.gameMode === "pishpirik") && room.maxPlayers === 4;
 
   async function toggleReady() {
     await fetch(`/api/rooms/${code}/ready`, {
@@ -438,17 +438,27 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
       {is2v2 && <p className="text-center text-neon-blue-soft text-sm font-bold italic mb-4 animate-pulse">Drag and drop players to swap seats & teams!</p>}
 
       {is2v2 ? (
+        // 2v2 Glowing Team Box Highlights
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="glass rounded-xl p-4 bg-neon-blue/5 border border-neon-blue/20">
-            <h3 className="text-center font-black text-xl text-neon-blue-soft mb-4 uppercase tracking-widest">Team 1</h3>
-            <div className="flex flex-col gap-4">
+          {/* Team 1 Glowing Box */}
+          <div className="glass rounded-2xl p-5 bg-neon-blue/10 border-2 border-neon-blue shadow-[0_0_25px_rgba(77,216,255,0.35)] relative overflow-hidden">
+            <div className="absolute -top-12 -left-12 w-32 h-32 bg-neon-blue/20 rounded-full blur-2xl pointer-events-none" />
+            <h3 className="text-center font-black text-2xl text-neon-blue-soft mb-4 uppercase tracking-widest drop-shadow-[0_0_10px_#4dd8ff]">
+              Team 1
+            </h3>
+            <div className="flex flex-col gap-4 relative z-10">
               {renderSeat(room.seats[0], 0)}
               {renderSeat(room.seats[2], 2)}
             </div>
           </div>
-          <div className="glass rounded-xl p-4 bg-neon-pink/5 border border-neon-pink/20">
-            <h3 className="text-center font-black text-xl text-neon-pink mb-4 uppercase tracking-widest">Team 2</h3>
-            <div className="flex flex-col gap-4">
+
+          {/* Team 2 Glowing Box */}
+          <div className="glass rounded-2xl p-5 bg-neon-pink/10 border-2 border-neon-pink shadow-[0_0_25px_rgba(255,91,200,0.35)] relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-neon-pink/20 rounded-full blur-2xl pointer-events-none" />
+            <h3 className="text-center font-black text-2xl text-neon-pink mb-4 uppercase tracking-widest drop-shadow-[0_0_10px_#ff5bc8]">
+              Team 2
+            </h3>
+            <div className="flex flex-col gap-4 relative z-10">
               {renderSeat(room.seats[1], 1)}
               {renderSeat(room.seats[3], 3)}
             </div>
