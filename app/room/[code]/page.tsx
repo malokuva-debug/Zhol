@@ -841,14 +841,7 @@ function PishpirikBoard({
     });
   }
 
-  {isHost && oppClientId && (
-  <button 
-    onClick={() => kickPlayer(oppClientId)} 
-    className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
-  >
-    Kick
-  </button>
-)}
+  async function playCard(cardId: string) {
 
   async function playCard(cardId: string) {
     setActionError("");
@@ -1293,48 +1286,38 @@ function GameBoard({
       </AnimatePresence>
 
       <div className="relative h-48 sm:h-56 z-20">
-  {game.opponents.map((opp) => {
-    // Calculate strict relative position so teammates sit across from each other
-    const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
-    const visualIndex = relIdx - 1;
-    const pos = seatPosition(visualIndex, room.maxPlayers - 1);
-    
-    const oppClientId = room.seats[opp.seatIdx]?.clientId;
-    
-    return (
-      <div key={opp.seatIdx} className="absolute -translate-x-1/2 -translate-y-1/2 space-y-1" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
-        <PlayerStrip 
-          nickname={opp.nickname} 
-          connected={opp.connected} 
-          cardCount={opp.cardCount} 
-          score={opp.score} 
-          eliminated={opp.eliminated} 
-          isTurn={game.turnIdx === opp.seatIdx} 
-          faceDown={false} 
-          team={opp.team} 
-        />
-        
-        {isHost && oppClientId && (
-          <button 
-            onClick={() => kickPlayer(oppClientId)} 
-            className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
-          >
-            Kick
-          </button>
-        )}
-        
-        {!opp.eliminated && (
-          <div className="flex justify-center mt-2">
-            <OpponentFan count={opp.cardCount} />
-          </div>
-        )}
-      </div>
-    );
-  })}
-</div>
-                  ) : (
-                    <OpponentFan count={opp.cardCount} />
-                  )}
+        {displayGame.opponents.map((opp) => {
+          const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
+          const visualIndex = relIdx - 1;
+          const pos = seatPosition(visualIndex, room.maxPlayers - 1);
+          
+          const oppClientId = room.seats[opp.seatIdx]?.clientId;
+          
+          return (
+            <div key={opp.seatIdx} className="absolute -translate-x-1/2 -translate-y-1/2 space-y-1" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
+              <PlayerStrip 
+                nickname={opp.nickname} 
+                connected={opp.connected} 
+                cardCount={opp.cardCount} 
+                score={opp.score} 
+                eliminated={opp.eliminated} 
+                isTurn={displayGame.turnIdx === opp.seatIdx} 
+                faceDown={false} 
+                team={opp.team} 
+              />
+              
+              {isHost && oppClientId && (
+                <button 
+                  onClick={() => kickPlayer(oppClientId)} 
+                  className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
+                >
+                  Kick
+                </button>
+              )}
+              
+              {!opp.eliminated && (
+                <div className="flex justify-center mt-2">
+                  <OpponentFan count={opp.cardCount} />
                 </div>
               )}
             </div>
