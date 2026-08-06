@@ -953,6 +953,7 @@ function PishpirikBoard({
         <AnimatePresence>
           {game.turnPhase === "round_over" && game.lastRoundEnd && (
             <RoundEndReveal 
+              room={room} /* NEW */
               gameState={game} 
               isHost={isHost}
               onNextRound={async () => {
@@ -1207,7 +1208,16 @@ function GameBoard({
           const oppClientId = room.seats[opp.seatIdx]?.clientId;
           return (
             <div key={opp.seatIdx} className="absolute -translate-x-1/2 -translate-y-1/2 space-y-1" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
-              <PlayerStrip nickname={opp.nickname} connected={opp.connected} cardCount={opp.cardCount} score={opp.score} eliminated={opp.eliminated} isTurn={displayGame.turnIdx === opp.seatIdx} faceDown />
+              <PlayerStrip 
+                nickname={opp.nickname} 
+                connected={opp.connected} 
+                cardCount={opp.cardCount} 
+                score={opp.score} 
+                eliminated={opp.eliminated} 
+                isTurn={displayGame.turnIdx === opp.seatIdx} 
+                faceDown 
+                team={opp.team} /* NEW */ 
+              />
               {isHost && oppClientId && (
                 <button onClick={() => kickPlayer(oppClientId)} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
                   Kick
@@ -1322,8 +1332,16 @@ function GameBoard({
         <HandFan cards={showingScore ? [] : displayGame.yourHand} selectedCard={selectedCard} onSelect={(id) => canAct && setSelectedCard(selectedCard === id ? null : id)} interactive={canAct && !showingScore} meldIndexByCard={meldIndexByCard} onDragEnd={handleDragEnd} insertAtX={dropX} />
       </div>
 
-      <PlayerStrip nickname={you?.nickname ?? "You"} connected={!!you?.connected} cardCount={displayGame.yourHand.length} score={you?.score ?? 0} eliminated={you?.eliminated ?? false} isTurn={displayGame.turnIdx === yourSeat} />
-
+      <PlayerStrip 
+        nickname={room.seats[yourSeat]?.nickname ?? "You"} 
+        connected={!!room.seats[yourSeat]?.connected} 
+        cardCount={game.matchOver ? 0 : game.yourHand.length} 
+        score={room.seats[yourSeat]?.score ?? 0} 
+        eliminated={room.seats[yourSeat]?.eliminated ?? false} 
+        isTurn={game.turnIdx === yourSeat} 
+        team={room.seats[yourSeat]?.team} /* NEW */ 
+      />
+      
       {showCheat && displayGame && (
         <CheatManager roomCode={room.code} clientId={clientId} gameState={displayGame} onClose={() => setShowCheat(false)} />
       )}
@@ -1348,12 +1366,24 @@ const ActionButton = forwardRef<HTMLButtonElement, { children: React.ReactNode; 
 });
 ActionButton.displayName = "ActionButton";
 
-function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn, faceDown }: { nickname: string; connected: boolean; cardCount: number; score: number; eliminated: boolean; isTurn: boolean; faceDown?: boolean; }) {
+function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn, faceDown, team }: { nickname: string; connected: boolean; cardCount: number; score: number; eliminated: boolean; isTurn: boolean; faceDown?: boolean; team?: 1 | 2; }) {
+  // NEW: Thicker colored left border if they are on a team
+  const teamStyle = team === 1 
+    ? "border-l-4 border-l-neon-blue shadow-[inset_4px_0_10px_rgba(77,216,255,0.1)]" 
+    : team === 2 
+    ? "border-l-4 border-l-neon-pink shadow-[inset_4px_0_10px_rgba(255,91,200,0.1)]" 
+    : "";
+
   return (
-    <div className={`glass flex items-center justify-between rounded-xl px-4 py-2.5 ${isTurn && !eliminated ? "ring-1 ring-neon-blue/50" : ""} ${eliminated ? "opacity-40 grayscale" : ""}`}>
+    <div className={`glass flex items-center justify-between rounded-xl px-4 py-2.5 ${isTurn && !eliminated ? "ring-1 ring-neon-blue/50" : ""} ${eliminated ? "opacity-40 grayscale" : ""} ${teamStyle}`}>
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
+        
+        {/* NEW: Team Labels */}
+        {team === 1 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-blue/20 text-neon-blue-soft px-1.5 py-0.5 rounded">Team 1</span>}
+        {team === 2 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-pink/20 text-neon-pink px-1.5 py-0.5 rounded">Team 2</span>}
+        
         {eliminated && <span className="text-xs text-neon-pink">out</span>}
         {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting...</span>}
         {faceDown && !eliminated && <span className="text-xs text-white/40">• {cardCount} cards</span>}
