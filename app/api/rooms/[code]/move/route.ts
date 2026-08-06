@@ -12,7 +12,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
   z.object({ action: z.literal("restart_match"), clientId: z.string() }),
-  z.object({ action: z.literal("swap_seats"), clientId: z.string(), from: z.number(), to: z.number() }), // <-- NEW ACTION
+  z.object({ action: z.literal("swap_seats"), clientId: z.string(), from: z.number(), to: z.number() }),
   z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
   z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }),
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
@@ -26,14 +26,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   const body = await req.json().catch(() => null);
   const parsed = Schema.safeParse(body);
 
-  // MUST BE FIRST! Validates the payload exists before touching `parsed.data`
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request payload." }, { status: 400 });
   }
 
   const room = await getRoom(code.toUpperCase());
-  if (!room || room.status !== "playing" || !room.game) {
-    return NextResponse.json({ error: "Room not active or match finished." }, { status: 404 });
+  if (!room) {
+    return NextResponse.json({ error: "Room not found." }, { status: 404 });
   }
 
   const seatIdx = room.seats.findIndex((s) => s?.clientId === parsed.data.clientId);
@@ -41,22 +40,34 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ error: "Player not seated in this room." }, { status: 403 });
   }
 
-  // --- ACTIONS THAT CAN BE DONE ANYTIME ---
+  // --- ACTIONS THAT CAN BE DONE IN ANY STATE (Waiting, Playing, Finished) ---
+
+  if (parsed.data.action === "chat") {
+    if (!room.chat) room.chat = [];
+    const result = addChatMessage(room, parsed.data.clientId, parsed.data.text);
+    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+
+    await saveRoom(room);
+    await publishRoomUpdate(room.code);
+    return NextResponse.json({ ok: true });
+  }
+
+  // --- ACTIONS THAT CAN BE DONE ONLY WHILE WAITING ---
 
   if (parsed.data.action === "swap_seats") {
-    const { from, to } = parsed.data;
+    if (room.status !== "waiting") {
+      return NextResponse.json({ error: "Cannot swap seats after game started." }, { status: 400 });
+    }
     
-    // Ensure bounds
+    const { from, to } = parsed.data;
     if (from >= 0 && from < room.maxPlayers && to >= 0 && to < room.maxPlayers) {
-      // Swap the seats in the array
       const temp = room.seats[from];
       room.seats[from] = room.seats[to];
       room.seats[to] = temp;
 
-      // Ensure team flags are instantly updated to match the new seating
       if (room.rules.teamMode === "2v2") {
-        if (room.seats[from]) room.seats[from].team = from % 2 === 0 ? 1 : 2;
-        if (room.seats[to]) room.seats[to].team = to % 2 === 0 ? 1 : 2;
+        if (room.seats[from]) room.seats[from]!.team = from % 2 === 0 ? 1 : 2;
+        if (room.seats[to]) room.seats[to]!.team = to % 2 === 0 ? 1 : 2;
       }
 
       await saveRoom(room);
@@ -64,7 +75,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     }
     return NextResponse.json({ ok: true });
   }
-  
+
+  // --- ACTIONS THAT CAN BE DONE WHILE FINISHED OR PLAYING ---
+
   if (parsed.data.action === "restart_match") {
     if (room.hostClientId !== parsed.data.clientId) {
       return NextResponse.json({ error: "Only the host can restart the match." }, { status: 403 });
@@ -73,6 +86,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     await saveRoom(room);
     await publishRoomUpdate(room.code);
     return NextResponse.json({ ok: true });
+  }
+
+  // -----------------------------------------------------------
+  // THE REST REQUIRES AN ACTIVE GAME
+  // -----------------------------------------------------------
+
+  if (!room.game || room.status === "waiting") {
+    return NextResponse.json({ error: "Match not active." }, { status: 400 });
   }
 
   if (parsed.data.action === "next_round") {
@@ -92,18 +113,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ ok: true });
   }
 
-  if (parsed.data.action === "chat") {
-    if (!room.chat) room.chat = []; // Safe fallback for rooms generated before chat existed
-    
-    const result = addChatMessage(room, parsed.data.clientId, parsed.data.text);
-    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
-
-    await saveRoom(room);
-    await publishRoomUpdate(room.code);
-    return NextResponse.json({ ok: true });
-  }
-
-  // --- GAMEPLAY MOVES (Requires it to be your turn) ---
+  // --- STRICT IN-GAME MOVES (Requires it to be your turn) ---
 
   if (room.game.turnIdx !== seatIdx) {
     return NextResponse.json({ error: "Not your turn!" }, { status: 400 });
@@ -156,11 +166,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const tablePile = room.game.tablePile || [];
       const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       
-      let { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
-
-      if (captures && tablePile.length === 1) {
-        isPishpirik = true;
-      }
+      const { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
