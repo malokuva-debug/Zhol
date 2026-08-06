@@ -342,6 +342,14 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
     });
   }
 
+  async function restartMatch() {
+    await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restart_match", clientId: getClientId() }),
+    });
+  }
+
   async function leave() {
     removeRecentRoom(code);
     await fetch(`/api/rooms/${code}/leave`, {
@@ -1209,17 +1217,19 @@ function GameBoard({
             {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
               <RoundEndReveal 
                 gameState={displayGame} 
+                isHost={isHost} // <--- Added
                 onNextRound={async () => {
                   try {
-                    await fetch(`/api/rooms/${room.code}/move`, {
+                    await fetch(`/api/rooms/${code}/move`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "next_round", clientId }),
+                      body: JSON.stringify({ action: "next_round", clientId: getClientId() }),
                     });
                   } catch (err) {
                     console.error("Failed to start next round", err);
                   }
                 }}
+                onRestartMatch={restartMatch} // <--- Added
                 onLeave={leave}
               />
             )}
