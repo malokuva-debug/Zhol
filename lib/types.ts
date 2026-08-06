@@ -164,6 +164,7 @@ export interface ClientOpponentView {
   nickname: string;
   connected: boolean;
   cardCount: number;
+  hand?: string[]; // <--- ADD THIS LINE TO EXPOSE OPPONENT CARDS
   score: number;
   eliminated: boolean;
   team?: 1 | 2;
