@@ -74,9 +74,10 @@ export function addChatMessage(room: Room, clientId: string, text: string) {
 
   room.chat.push({
     id: Math.random().toString(36).substring(2, 10),
+    kind: "chat", // FIX: added 'kind' property
     nickname: seat.nickname,
-    text: text.slice(0, 150), // keep it within our 150 char limit
-    timestamp: Date.now(),
+    text: text.slice(0, 150).trim(),
+    at: Date.now(), // FIX: renamed 'timestamp' to 'at'
   });
 
   // Keep only the latest 50 messages so the room state doesn't get too large
