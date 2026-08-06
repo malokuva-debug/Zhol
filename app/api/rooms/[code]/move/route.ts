@@ -139,15 +139,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       seat.hand = seat.hand.filter((c) => c !== cardId);
 
       const tablePile = room.game.tablePile || [];
-      // Move this up so we can use activeSeats for Pishpirik cancellation
       const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       
-      let { captures, isPishpirik } = checkPishpirikCapture(cardId, tablePile);
-
-      // FIX: When only 1 card is on the pile and it gets captured, it's a Pishpirik!
-      if (captures && tablePile.length === 1) {
-        isPishpirik = true;
-      }
+      const { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
@@ -159,19 +153,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         room.game.lastCaptureIdx = seatIdx;
 
         if (isPishpirik) {
-          // Guarantee pishpiriksBySeat is an object and assign it to a local variable
-          if (!room.game.pishpiriksBySeat) {
-            room.game.pishpiriksBySeat = {};
-          }
+          const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
-
-          // Take down the enemy's pishpirik if they have one. Otherwise count for us.
+          
+          // Find an enemy who has > 0 Pishpirik points to cancel out
           const enemyIdx = activeSeats.find((i) => i !== seatIdx && (pishMap[i] || 0) > 0);
 
           if (enemyIdx !== undefined) {
-            pishMap[enemyIdx] = (pishMap[enemyIdx] || 0) - 1; // Cancel theirs out
+             const enemyCurrent = pishMap[enemyIdx];
+             if (enemyCurrent > pishPts) {
+                 pishMap[enemyIdx] -= pishPts;
+             } else if (enemyCurrent < pishPts) {
+                 pishMap[enemyIdx] = 0;
+                 pishMap[seatIdx] = (pishMap[seatIdx] || 0) + (pishPts - enemyCurrent);
+             } else {
+                 pishMap[enemyIdx] = 0; // Exact cancel
+             }
           } else {
-            pishMap[seatIdx] = (pishMap[seatIdx] || 0) + 1; // Keep ours
+            pishMap[seatIdx] = (pishMap[seatIdx] || 0) + pishPts;
           }
         }
       } else {
@@ -186,6 +185,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.seats[i]!.hand = room.game.deck.splice(0, 4);
           }
         } else {
+          // Round is completely over
           if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
             const remaining = room.game.tablePile;
             room.game.capturedBySeat[room.game.lastCaptureIdx] = [
@@ -199,13 +199,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
           let winnerIdx = seatIdx;
           const pointsBySeat = [];
 
-          // Calculate final scores
           for (const i of activeSeats) {
             const captured = room.game.capturedBySeat[i] || [];
             const rawPts = scorePishpirikCards(captured);
-            const pishCount = room.game.pishpiriksBySeat[i] || 0;
+            const pishPts = room.game.pishpiriksBySeat[i] || 0;
             
-            const roundPoints = rawPts + (pishCount * 10);
+            // Raw points handles the standard card scores (so Jack on Jack = 2 pts). 
+            // pishPts handles the bonus (20 pts). Result is 22!
+            const roundPoints = rawPts + pishPts; 
             room.seats[i]!.score += roundPoints;
 
             if (room.seats[i]!.score > highestScore) {
@@ -215,7 +216,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
             pointsBySeat.push({
                seatIdx: i,
-               deadwood: roundPoints, // We reuse the "deadwood" UI prop to display the points they earned
+               deadwood: roundPoints, // Re-using this UI property to show points earned
                deadCards: [],
                melds: [],
                eliminated: false
@@ -223,10 +224,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
           }
 
           room.game.turnPhase = "round_over";
-          room.game.matchOver = true;
+          room.game.matchOver = true; 
           room.game.matchWinnerIdx = winnerIdx;
 
-          // FIX: Add `lastRoundEnd` object so the Round End UI actually pops up!
+          // Expose to the frontend to trigger the End Screen UI!
           room.game.lastRoundEnd = {
             type: "PISHPIRIK",
             winnerIdx: winnerIdx,
