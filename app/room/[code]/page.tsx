@@ -411,6 +411,11 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
       {seat ? (
         <>
           <div className="text-lg font-bold text-white pointer-events-none">{seat.nickname}</div>
+          {is2v2 && seat.team && (
+            <div className={`mt-1 text-xs font-bold tracking-wider pointer-events-none ${seat.team === 1 ? "text-neon-blue-soft" : "text-neon-pink"}`}>
+              Team {seat.team}
+            </div>
+          )}
           <div className={`mt-2 inline-block rounded-full px-3 py-0.5 text-[10px] font-bold pointer-events-none ${seat.ready ? "bg-neon-blue/20 text-neon-blue-soft" : "bg-white/10 text-white/40"}`}>
             {seat.ready ? "Ready" : "Not ready"}
           </div>
@@ -1415,11 +1420,11 @@ const ActionButton = forwardRef<HTMLButtonElement, { children: React.ReactNode; 
 ActionButton.displayName = "ActionButton";
 
 function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn, faceDown, team }: { nickname: string; connected: boolean; cardCount: number; score: number; eliminated: boolean; isTurn: boolean; faceDown?: boolean; team?: 1 | 2; }) {
-  // Thicker colored left border if they are on a team
+  // Enhanced team styling with glow for better visibility
   const teamStyle = team === 1 
-    ? "border-l-4 border-l-neon-blue shadow-[inset_4px_0_10px_rgba(77,216,255,0.1)]" 
+    ? "border-l-4 border-l-neon-blue shadow-[inset_4px_0_10px_rgba(77,216,255,0.15),-2px_0_8px_rgba(77,216,255,0.1)]" 
     : team === 2 
-    ? "border-l-4 border-l-neon-pink shadow-[inset_4px_0_10px_rgba(255,91,200,0.1)]" 
+    ? "border-l-4 border-l-neon-pink shadow-[inset_4px_0_10px_rgba(255,91,200,0.15),-2px_0_8px_rgba(255,91,200,0.1)]" 
     : "";
 
   return (
@@ -1428,9 +1433,9 @@ function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
         
-        {/* Team Labels */}
-        {team === 1 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-blue/20 text-neon-blue-soft px-1.5 py-0.5 rounded">Team 1</span>}
-        {team === 2 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-pink/20 text-neon-pink px-1.5 py-0.5 rounded">Team 2</span>}
+        {/* Team Labels - with better contrast */}
+        {team === 1 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-blue/30 text-neon-blue px-2 py-0.5 rounded-md border border-neon-blue/40">Team 1</span>}
+        {team === 2 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-pink/30 text-neon-pink px-2 py-0.5 rounded-md border border-neon-pink/40">Team 2</span>}
         
         {eliminated && <span className="text-xs text-neon-pink">out</span>}
         {!eliminated && !connected && <span className="text-xs text-neon-pink">reconnecting...</span>}
