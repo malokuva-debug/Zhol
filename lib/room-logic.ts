@@ -198,7 +198,7 @@ export function initializeGame(room: Room) {
     return;
   }
 
-  export function restartMatch(room: Room) {
+export function restartMatch(room: Room) {
   room.seats.forEach((seat) => {
     if (seat) {
       seat.score = 0;
