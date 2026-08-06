@@ -211,7 +211,6 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
   const [text, setText] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // GUARANTEE we have an array to map over, even if the server sends undefined
   const chatMessages = room.chat || [];
 
   useEffect(() => {
@@ -224,7 +223,7 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
     e.preventDefault();
     if (!text.trim()) return;
     const msg = text;
-    setText(""); // clear input instantly
+    setText("");
     
     await fetch(`/api/rooms/${room.code}/move`, {
       method: "POST",
@@ -264,6 +263,7 @@ function ChatBox({ room, clientId }: { room: Omit<Room, "passwordHash">; clientI
     </div>
   );
 }
+
 // ----------------------------------------------------------------------
 // HEADER & WAITING ROOM
 // ----------------------------------------------------------------------
@@ -298,7 +298,6 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
         <div className="flex items-center gap-3 mb-1">
           <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">{room.name}</span>
           
-          {/* NEW: Massive glowing 2v2 Team Badge at the top of the room! */}
           {room.rules.teamMode === "2v2" && (
             <span className="bg-gradient-to-r from-neon-blue to-neon-pink text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded shadow-[0_0_15px_rgba(163,91,255,0.4)]">
               2V2 Teams
@@ -326,6 +325,7 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
     </header>
   );
 }
+
 function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "passwordHash">; yourSeat: number | null; clientId: string; code: string; }) {
   const router = useRouter();
   const isHost = room.hostClientId === clientId;
@@ -389,7 +389,6 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
       draggable
       onDragStart={(e) => {
         setDraggedSeat(i);
-        // Visual flair for the item being dragged
         e.currentTarget.style.opacity = "0.5";
       }}
       onDragEnd={(e) => {
@@ -436,11 +435,9 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
 
   return (
     <div className="glass glow-purple rounded-2xl p-6">
-      
       {is2v2 && <p className="text-center text-neon-blue-soft text-sm font-bold italic mb-4 animate-pulse">Drag and drop players to swap seats & teams!</p>}
 
       {is2v2 ? (
-        // 2v2 Split Layout
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="glass rounded-xl p-4 bg-neon-blue/5 border border-neon-blue/20">
             <h3 className="text-center font-black text-xl text-neon-blue-soft mb-4 uppercase tracking-widest">Team 1</h3>
@@ -458,7 +455,6 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
           </div>
         </div>
       ) : (
-        // Standard Layout
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {room.seats.map((seat, i) => renderSeat(seat, i))}
         </div>
@@ -792,7 +788,6 @@ function PishpirikBoard({
   selectedCard: string | null; setSelectedCard: (c: string | null) => void;
   actionError: string; setActionError: (e: string) => void;
 }) {
-  // Find this section inside PishpirikBoard:
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
   const canAct = isYourTurn && game.turnPhase === "discard";
   const tablePile = game.tablePile || [];
@@ -801,7 +796,6 @@ function PishpirikBoard({
   const [showGraveyard, setShowGraveyard] = useState(false);
   const [showPishpirikAnim, setShowPishpirikAnim] = useState(false);
 
-  // --- NEW: AGGREGATE TEAM GRAVEYARD MID-GAME ---
   const is2v2 = room.rules.teamMode === "2v2";
   const myTeam = room.seats[yourSeat]?.team;
 
@@ -820,18 +814,17 @@ function PishpirikBoard({
     myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
   }
 
-  // NEW: Setup Host and Restart logic
   const clientId = getClientId();
   const isHost = room.hostClientId === clientId;
 
   async function kickPlayer(targetClientId: string) {
-  if (!confirm("Are you sure you want to kick this player?")) return;
-  await fetch(`/api/rooms/${code}/kick`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ clientId, targetClientId }),
-  });
-}
+    if (!confirm("Are you sure you want to kick this player?")) return;
+    await fetch(`/api/rooms/${code}/kick`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, targetClientId }),
+    });
+  }
 
   async function restartMatch() {
     await fetch(`/api/rooms/${code}/move`, {
@@ -842,18 +835,14 @@ function PishpirikBoard({
   }
 
   async function playCard(cardId: string) {
-
-  async function playCard(cardId: string) {
     setActionError("");
 
-    // Detect if we are playing a Jack on an empty table to show the Ghost Skull
     const { rank } = parseCardId(cardId);
     if (rank === "J" && tablePile.length === 0) {
       setShowSkull(true);
       setTimeout(() => setShowSkull(false), 2000);
     }
 
-    // Pishpirik Animation Detection
     if (tablePile.length === 1) {
       const topRank = parseCardId(tablePile[0]).rank;
       if (rank === topRank || rank === "J") {
@@ -934,7 +923,7 @@ function PishpirikBoard({
         </div>
       )}
 
-      {/* NEW: Add Opponent rendering to Pishpirik! */}
+      {/* Opponents rendering for Pishpirik */}
       <div className="relative h-48 sm:h-56 z-20">
         {game.opponents.map((opp) => {
           const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
@@ -957,15 +946,14 @@ function PishpirikBoard({
               />
               
               {isHost && oppClientId && (
-  <button 
-    onClick={() => kickPlayer(oppClientId)} 
-    className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
-  >
-    Kick
-  </button>
-)}
+                <button 
+                  onClick={() => kickPlayer(oppClientId)} 
+                  className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
+                >
+                  Kick
+                </button>
+              )}
               
-              {/* Render face-down cards */}
               {!opp.eliminated && (
                 <div className="flex justify-center mt-2">
                   <OpponentFan count={opp.cardCount} />
@@ -1036,7 +1024,7 @@ function PishpirikBoard({
         <AnimatePresence>
           {game.turnPhase === "round_over" && game.lastRoundEnd && (
             <RoundEndReveal 
-              room={room} /* NEW */
+              room={room}
               gameState={game} 
               isHost={isHost}
               onNextRound={async () => {
@@ -1162,7 +1150,6 @@ function GameBoard({
     return best;
   }, [canAct, playableHand, selectedCard]);
 
-  // NEW: Added Restart Match
   async function restartMatch() {
     await fetch(`/api/rooms/${code}/move`, {
       method: "POST",
@@ -1387,11 +1374,11 @@ function GameBoard({
           {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
           
           <AnimatePresence>
-          {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
-            <RoundEndReveal 
-              room={room} /* <--- ADD THIS LINE */
-              gameState={displayGame} 
-              isHost={isHost}
+            {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
+              <RoundEndReveal 
+                room={room}
+                gameState={displayGame} 
+                isHost={isHost}
                 onNextRound={async () => {
                   try {
                     await fetch(`/api/rooms/${code}/move`, {
@@ -1436,7 +1423,7 @@ function GameBoard({
         score={room.seats[yourSeat]?.score ?? 0} 
         eliminated={room.seats[yourSeat]?.eliminated ?? false} 
         isTurn={game.turnIdx === yourSeat} 
-        team={room.seats[yourSeat]?.team} /* NEW */ 
+        team={room.seats[yourSeat]?.team} 
       />
       
       {showCheat && displayGame && (
@@ -1445,6 +1432,7 @@ function GameBoard({
     </div>
   );
 }
+
 // ----------------------------------------------------------------------
 // SHARED UTILITIES
 // ----------------------------------------------------------------------
@@ -1464,7 +1452,6 @@ const ActionButton = forwardRef<HTMLButtonElement, { children: React.ReactNode; 
 ActionButton.displayName = "ActionButton";
 
 function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn, faceDown, team }: { nickname: string; connected: boolean; cardCount: number; score: number; eliminated: boolean; isTurn: boolean; faceDown?: boolean; team?: 1 | 2; }) {
-  // Enhanced team styling with glow for better visibility
   const teamStyle = team === 1 
     ? "border-l-4 border-l-neon-blue shadow-[inset_4px_0_10px_rgba(77,216,255,0.15),-2px_0_8px_rgba(77,216,255,0.1)]" 
     : team === 2 
@@ -1477,7 +1464,6 @@ function PlayerStrip({ nickname, connected, cardCount, score, eliminated, isTurn
         <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400" : "bg-neon-pink animate-pulse"}`} />
         <span className="font-bold text-white">{nickname}</span>
         
-        {/* Team Labels - with better contrast */}
         {team === 1 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-blue/30 text-neon-blue px-2 py-0.5 rounded-md border border-neon-blue/40">Team 1</span>}
         {team === 2 && <span className="text-[9px] uppercase font-black tracking-widest bg-neon-pink/30 text-neon-pink px-2 py-0.5 rounded-md border border-neon-pink/40">Team 2</span>}
         
