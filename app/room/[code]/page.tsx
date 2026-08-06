@@ -787,6 +787,7 @@ function PishpirikBoard({
   selectedCard: string | null; setSelectedCard: (c: string | null) => void;
   actionError: string; setActionError: (e: string) => void;
 }) {
+  // Find this section inside PishpirikBoard:
   const isYourTurn = game.turnIdx === yourSeat && !game.matchOver;
   const canAct = isYourTurn && game.turnPhase === "discard";
   const tablePile = game.tablePile || [];
@@ -795,8 +796,24 @@ function PishpirikBoard({
   const [showGraveyard, setShowGraveyard] = useState(false);
   const [showPishpirikAnim, setShowPishpirikAnim] = useState(false);
 
-  const myCaptured = game.capturedBySeat?.[yourSeat] || [];
-  const myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
+  // --- NEW: AGGREGATE TEAM GRAVEYARD MID-GAME ---
+  const is2v2 = room.rules.teamMode === "2v2";
+  const myTeam = room.seats[yourSeat]?.team;
+
+  let myCaptured: string[] = [];
+  let myPishPts = 0;
+
+  if (is2v2 && myTeam) {
+    room.seats.forEach((s, i) => {
+      if (s?.team === myTeam) {
+        myCaptured = [...myCaptured, ...(game.capturedBySeat?.[i] || [])];
+        myPishPts += (game.pishpiriksBySeat?.[i] || 0);
+      }
+    });
+  } else {
+    myCaptured = game.capturedBySeat?.[yourSeat] || [];
+    myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
+  }
 
   // NEW: Setup Host and Restart logic
   const clientId = getClientId();
