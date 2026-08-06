@@ -8,13 +8,11 @@ import PlayingCard from "./PlayingCard";
 
 interface Props {
   gameState: ClientGameState;
-  isHost: boolean; // NEW PROP
+  isHost: boolean;
   onNextRound: () => void;
-  onRestartMatch: () => void; // NEW PROP
+  onRestartMatch: () => void;
   onLeave: () => void;
 }
-
-export default function RoundEndReveal({ gameState, isHost, onNextRound, onRestartMatch, onLeave }: Props) {
 
 // 🃏 Helper to visually render the actual deadwood cards
 function MiniCard({ cardId }: { cardId: string }) {
@@ -48,7 +46,7 @@ function DeadwoodRow({
   melds, 
   eliminated, 
   isWinner,
-  isPishpirikGame // NEW PROP
+  isPishpirikGame
 }: { 
   name: string; 
   deadwood: number; 
@@ -61,7 +59,6 @@ function DeadwoodRow({
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
   const item = { hidden: { opacity: 0, scale: 0.5, x: 20 }, show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } } };
 
-  // FIX: In Pishpirik, everyone shows their captured cards. In Zhol, only losers show deadwood.
   const showCards = isPishpirikGame ? deadCards.length > 0 : (!isWinner && deadCards.length > 0);
   const cardsLabel = isPishpirikGame ? "Captured Cards:" : "Deadwood:";
 
@@ -99,7 +96,8 @@ function DeadwoodRow({
             ))}
           </div>
         )}
-
+        
+        {/* Render Leftover Deadwood or Captured Cards */}
         {showCards && (
           <motion.div variants={container} initial="hidden" animate="show" className={`flex flex-wrap gap-2 mt-1 p-2 border rounded-lg ${isPishpirikGame ? 'bg-blue-900/20 border-blue-900/40' : 'bg-red-900/20 border-red-900/40'}`}>
             <span className={`w-full text-xs uppercase tracking-widest font-bold mb-1 ${isPishpirikGame ? 'text-blue-400' : 'text-red-400'}`}>{cardsLabel}</span>
@@ -110,24 +108,8 @@ function DeadwoodRow({
             ))}
           </motion.div>
         )}
-      </div>
-    </div>
-  );
-}
-        
-        {/* Render Leftover Deadwood only for losers */}
-        {!isWinner && deadCards.length > 0 && (
-          <motion.div variants={container} initial="hidden" animate="show" className="flex flex-wrap gap-2 mt-1 p-2 bg-red-900/20 border border-red-900/40 rounded-lg">
-            <span className="w-full text-xs text-red-400 uppercase tracking-widest font-bold mb-1">Deadwood:</span>
-            {deadCards.map((id, i) => (
-              <motion.div key={`${id}-${i}`} variants={item}>
-                <MiniCard cardId={id} />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
 
-        {!isWinner && deadCards.length === 0 && (
+        {!isWinner && deadCards.length === 0 && !isPishpirikGame && (
           <div className="mt-1 flex items-center text-slate-500 italic text-sm">
             No deadwood
           </div>
@@ -137,15 +119,12 @@ function DeadwoodRow({
   );
 }
 
-export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Props) {
-  // 'smash' plays the impact animation, 'counting' shows the deadwood tally
+export default function RoundEndReveal({ gameState, isHost, onNextRound, onRestartMatch, onLeave }: Props) {
   const [phase, setPhase] = useState<"smash" | "counting">("smash");
 
   useEffect(() => {
     if (gameState.turnPhase === "round_over") {
       setPhase("smash");
-      
-      // Transition from Smash to Counting after 2.5 seconds
       const t1 = setTimeout(() => setPhase("counting"), 2500); 
       return () => clearTimeout(t1);
     }
@@ -154,10 +133,10 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
   if (gameState.turnPhase !== "round_over" || !gameState.lastRoundEnd) return null;
 
   const { type, winnerBonus, pointsBySeat } = gameState.lastRoundEnd;
+  const isPishpirikGame = type === "PISHPIRIK";
   
-  // Format the visual label based on the specific Zhol achieved
   const ginLabel = 
-    type === "PISHPIRIK" ? "PISHPIRIK!" : 
+    isPishpirikGame ? "PISHPIRIK!" : 
     type === "suit_joker_gin" ? "SUIT & JOKER ZHOL!" : 
     type === "suit_gin" ? "SUIT ZHOL!" : 
     type === "joker_gin" ? "JOKER ZHOL!" : 
@@ -178,26 +157,28 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
             {ginLabel}
           </motion.div>
 
-          {/* Winner's Hand Display */}
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="z-30 bg-black/60 p-6 rounded-2xl border border-white/10 backdrop-blur-md"
-          >
-            <h3 className="text-white font-bold mb-3 text-center uppercase tracking-widest text-sm text-neon-blue-soft">Winner's Hand</h3>
-            <div className="flex flex-wrap gap-4 justify-center">
-              {gameState.lastRoundEnd.winnerMelds?.map((meld: any, mIdx: number) => (
-                <div key={mIdx} className="flex -space-x-4 bg-white/5 p-2 rounded-xl border border-white/10">
-                  {(meld.cards || meld).map((cardId: string, cIdx: number) => (
-                     <div key={cIdx} className="transform hover:-translate-y-2 transition-transform shadow-lg">
-                       <PlayingCard id={cardId} />
-                     </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </motion.div>
+          {/* Winner's Hand Display (Only for Zhol) */}
+          {!isPishpirikGame && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="z-30 bg-black/60 p-6 rounded-2xl border border-white/10 backdrop-blur-md"
+            >
+              <h3 className="text-white font-bold mb-3 text-center uppercase tracking-widest text-sm text-neon-blue-soft">Winner's Hand</h3>
+              <div className="flex flex-wrap gap-4 justify-center">
+                {gameState.lastRoundEnd.winnerMelds?.map((meld: any, mIdx: number) => (
+                  <div key={mIdx} className="flex -space-x-4 bg-white/5 p-2 rounded-xl border border-white/10">
+                    {(meld.cards || meld).map((cardId: string, cIdx: number) => (
+                       <div key={cIdx} className="transform hover:-translate-y-2 transition-transform shadow-lg">
+                         <PlayingCard id={cardId} />
+                       </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Background Scattered Cards (Force of the Gin) */}
           {[...Array(20)].map((_, i) => (
@@ -219,7 +200,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
           ))}
         </div>
       ) : (
-        /* 3. The Deadwood Counting Panel */
+        /* The Counting Panel */
         <motion.div 
           initial={{ opacity: 0, y: 50, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -227,11 +208,13 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
           className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl mx-4 max-h-[90vh] overflow-y-auto"
         >
           <h2 className="text-3xl font-black text-[#a35bff] mb-1 italic">{ginLabel}</h2>
-          <p className="text-slate-300 mb-6 font-medium">
-            Winner Bonus: <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded">-{winnerBonus} pts</span>
-          </p>
+          {!isPishpirikGame && (
+            <p className="text-slate-300 mb-6 font-medium">
+              Winner Bonus: <span className="font-bold text-white bg-white/10 px-2 py-0.5 rounded">-{winnerBonus} pts</span>
+            </p>
+          )}
           
-          <div className="space-y-4 mb-8">
+          <div className="space-y-4 mb-8 mt-4">
             {pointsBySeat.map((p) => {
               const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
               const isMe = p.seatIdx === gameState.yourSeat;
@@ -247,6 +230,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
                   melds={p.melds || []}
                   eliminated={p.eliminated}
                   isWinner={isWinner}
+                  isPishpirikGame={isPishpirikGame}
                 />
               );
             })}
