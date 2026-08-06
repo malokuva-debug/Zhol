@@ -137,8 +137,19 @@ export default function LobbyPage() {
               className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 border-b border-white/5 px-5 py-4 text-sm transition hover:bg-white/5"
             >
               <div>
-                <div className="font-semibold text-white">
-                  {room.name} {room.visibility === "private" && <span className="ml-1 text-xs text-neon-purple-soft">🔒</span>}
+                <div className="flex items-center font-semibold text-white">
+                  {room.name} 
+                  
+                  {/* NEW: Highlight 2v2 Teams in the lobby */}
+                  {room.rules.teamMode === "2v2" && (
+                    <span className="ml-2 inline-block rounded bg-gradient-to-r from-neon-blue to-neon-pink px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-white shadow-[0_0_10px_rgba(163,91,255,0.3)]">
+                      2V2
+                    </span>
+                  )}
+
+                  {room.visibility === "private" && (
+                    <span className="ml-1 text-xs text-neon-purple-soft">🔒</span>
+                  )}
                 </div>
                 <div className="text-xs text-white/40">
                   Host: {room.hostNickname} • Code {room.code}
