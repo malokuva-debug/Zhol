@@ -100,6 +100,8 @@ export function tryJoinRoom(
     return { ok: false, error: "Room is full." };
   }
 
+  // Inside tryJoinRoom in lib/room-logic.ts
+
   room.seats[freeIdx] = {
     nickname,
     clientId,
@@ -109,7 +111,8 @@ export function tryJoinRoom(
     hand: [],
     score: 0,
     eliminated: false,
-    team: room.rules.teamMode === "2v2" ? team || 1 : undefined,
+    // FIX: Automatically assign team based on alternating seats for 2v2
+    team: room.rules.teamMode === "2v2" ? (freeIdx % 2 === 0 ? 1 : 2) : undefined,
   };
 
   addSystemMessage(room, `${nickname} joined the room.`);
