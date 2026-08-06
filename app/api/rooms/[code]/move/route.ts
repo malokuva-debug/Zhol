@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoom, saveRoom } from "@/lib/store";
-import { applyDraw, applyDiscard, applyGin, startNextRound, addChatMessage, restartMatch } from "@/lib/room-logic";
+import { applyDraw, applyDiscard, applyGin, startNextRound, addChatMessage, restartMatch, enforceTeamAssignments } from "@/lib/room-logic";
 import { formsMill, hasNonMillPieces, hasLegalMoves, CICMIC_ADJACENCY, CICMIC_DESTROYED } from "@/lib/cicmic-engine";
 import { checkPishpirikCapture, scorePishpirikCards } from "@/lib/pishpirik-engine";
 import { publishRoomUpdate } from "@/lib/pusher";
@@ -56,10 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const temp = room.seats[from];
       room.seats[from] = room.seats[to];
       room.seats[to] = temp;
-      if (room.rules.teamMode === "2v2") {
-        if (room.seats[from]) room.seats[from]!.team = from % 2 === 0 ? 1 : 2;
-        if (room.seats[to]) room.seats[to]!.team = to % 2 === 0 ? 1 : 2;
-      }
+      enforceTeamAssignments(room);
       await saveRoom(room);
       await publishRoomUpdate(room.code);
     }
