@@ -84,7 +84,13 @@ export interface RoundEndInfo {
   winnerIdx: number;
   winnerMelds: Meld[];
   winnerBonus: number;
-  pointsBySeat: { seatIdx: number; deadwood: number; deadCards: CardId[]; eliminated: boolean }[];
+  pointsBySeat: {
+      seatIdx: number;
+      deadwood: number;
+      deadCards: string[];
+      melds?: any[]; // <--- ADD THIS LINE
+      eliminated: boolean;
+    }[];
 }
 
 export interface GameState {
