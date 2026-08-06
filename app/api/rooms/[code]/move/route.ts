@@ -42,6 +42,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   }
 
   // --- ACTIONS THAT CAN BE DONE ANYTIME ---
+
+  if (parsed.data.action === "swap_seats") {
+    const { from, to } = parsed.data;
+    
+    // Ensure bounds
+    if (from >= 0 && from < room.maxPlayers && to >= 0 && to < room.maxPlayers) {
+      // Swap the seats in the array
+      const temp = room.seats[from];
+      room.seats[from] = room.seats[to];
+      room.seats[to] = temp;
+
+      // Ensure team flags are instantly updated to match the new seating
+      if (room.rules.teamMode === "2v2") {
+        if (room.seats[from]) room.seats[from].team = from % 2 === 0 ? 1 : 2;
+        if (room.seats[to]) room.seats[to].team = to % 2 === 0 ? 1 : 2;
+      }
+
+      await saveRoom(room);
+      await publishRoomUpdate(room.code);
+    }
+    return NextResponse.json({ ok: true });
+  }
   
   if (parsed.data.action === "restart_match") {
     if (room.hostClientId !== parsed.data.clientId) {
