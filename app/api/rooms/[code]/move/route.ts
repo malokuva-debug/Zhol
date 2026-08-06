@@ -12,6 +12,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
   z.object({ action: z.literal("restart_match"), clientId: z.string() }),
+  z.object({ action: z.literal("swap_seats"), clientId: z.string(), from: z.number(), to: z.number() }), // <-- NEW ACTION
   z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
   z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }),
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
