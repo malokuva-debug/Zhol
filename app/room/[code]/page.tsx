@@ -832,14 +832,14 @@ function PishpirikBoard({
     });
   }
 
-  async function kickPlayer(targetClientId: string) {
-    if (!confirm("Are you sure you want to kick this player?")) return;
-    await fetch(`/api/rooms/${code}/kick`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, targetClientId }),
-    });
-  }
+  {isHost && oppClientId && (
+  <button 
+    onClick={() => kickPlayer(oppClientId)} 
+    className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30"
+  >
+    Kick
+  </button>
+)}
 
   async function playCard(cardId: string) {
     setActionError("");
