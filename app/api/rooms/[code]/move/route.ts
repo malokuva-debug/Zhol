@@ -139,7 +139,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       seat.hand = seat.hand.filter((c) => c !== cardId);
 
       const tablePile = room.game.tablePile || [];
-      const { captures, isPishpirik } = checkPishpirikCapture(cardId, tablePile);
+      // Move this up so we can use activeSeats for Pishpirik cancellation
+      const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
+      
+      let { captures, isPishpirik } = checkPishpirikCapture(cardId, tablePile);
+
+      // FIX: When only 1 card is on the pile and it gets captured, it's a Pishpirik!
+      if (captures && tablePile.length === 1) {
+        isPishpirik = true;
+      }
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
@@ -151,13 +159,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         room.game.lastCaptureIdx = seatIdx;
 
         if (isPishpirik) {
-          room.game.pishpiriksBySeat[seatIdx] = (room.game.pishpiriksBySeat[seatIdx] || 0) + 1;
+          // FIX: Take down the enemy's pishpirik if they have one. Otherwise count for us.
+          const enemyIdx = activeSeats.find(i => i !== seatIdx && (room.game.pishpiriksBySeat[i] || 0) > 0);
+          
+          if (enemyIdx !== undefined) {
+            room.game.pishpiriksBySeat[enemyIdx] -= 1; // Cancel theirs out
+          } else {
+            room.game.pishpiriksBySeat[seatIdx] = (room.game.pishpiriksBySeat[seatIdx] || 0) + 1; // Keep ours
+          }
         }
       } else {
         room.game.tablePile = [...tablePile, cardId];
       }
 
-      const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       const allHandsEmpty = activeSeats.every((i) => (room.seats[i]?.hand.length || 0) === 0);
 
       if (allHandsEmpty) {
@@ -175,15 +189,44 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.game.tablePile = [];
           }
 
+          let highestScore = -1;
+          let winnerIdx = seatIdx;
+          const pointsBySeat = [];
+
+          // Calculate final scores
           for (const i of activeSeats) {
             const captured = room.game.capturedBySeat[i] || [];
             const rawPts = scorePishpirikCards(captured);
             const pishCount = room.game.pishpiriksBySeat[i] || 0;
-            room.seats[i]!.score += rawPts + pishCount * 10;
+            
+            const roundPoints = rawPts + (pishCount * 10);
+            room.seats[i]!.score += roundPoints;
+
+            if (room.seats[i]!.score > highestScore) {
+              highestScore = room.seats[i]!.score;
+              winnerIdx = i;
+            }
+
+            pointsBySeat.push({
+               seatIdx: i,
+               deadwood: roundPoints, // We reuse the "deadwood" UI prop to display the points they earned
+               deadCards: [],
+               melds: [],
+               eliminated: false
+            });
           }
 
           room.game.turnPhase = "round_over";
           room.game.matchOver = true;
+          room.game.matchWinnerIdx = winnerIdx;
+
+          // FIX: Add `lastRoundEnd` object so the Round End UI actually pops up!
+          room.game.lastRoundEnd = {
+            type: "PISHPIRIK",
+            winnerIdx: winnerIdx,
+            winnerBonus: 0,
+            pointsBySeat
+          };
         }
       }
 
