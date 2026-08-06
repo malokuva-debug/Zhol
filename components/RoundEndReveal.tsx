@@ -2,11 +2,12 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import type { ClientGameState } from "@/lib/types";
+import type { ClientGameState, Room } from "@/lib/types";
 import { makeCard } from "@/lib/gin-engine";
 import PlayingCard from "./PlayingCard";
 
 interface Props {
+  room: Omit<Room, "passwordHash">; // NEW: Pass room to get team data
   gameState: ClientGameState;
   isHost: boolean;
   onNextRound: () => void;
@@ -14,7 +15,6 @@ interface Props {
   onLeave: () => void;
 }
 
-// 🃏 Helper to visually render the actual deadwood cards
 function MiniCard({ cardId }: { cardId: string }) {
   const card = makeCard(cardId);
   const isRed = card.suit === "H" || card.suit === "D";
@@ -38,7 +38,6 @@ function MiniCard({ cardId }: { cardId: string }) {
   );
 }
 
-// 🧮 Individual row for counting a player's hand (Winner + Losers)
 function DeadwoodRow({ 
   name, 
   deadwood, 
@@ -46,7 +45,8 @@ function DeadwoodRow({
   melds, 
   eliminated, 
   isWinner,
-  isPishpirikGame
+  isPishpirikGame,
+  team // NEW PROP
 }: { 
   name: string; 
   deadwood: number; 
@@ -55,6 +55,7 @@ function DeadwoodRow({
   eliminated: boolean; 
   isWinner: boolean;
   isPishpirikGame?: boolean;
+  team?: 1 | 2;
 }) {
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
   const item = { hidden: { opacity: 0, scale: 0.5, x: 20 }, show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } } };
@@ -65,9 +66,12 @@ function DeadwoodRow({
   return (
     <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700"}`}>
       <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
-        <span className="text-slate-200 font-bold text-lg">
+        <span className="text-slate-200 font-bold text-lg flex items-center gap-2">
           {name} 
-          {eliminated && <span className="text-neon-pink text-[10px] uppercase font-black tracking-wider ml-2 bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
+          {/* NEW: TEAM BADGES */}
+          {team === 1 && <span className="text-[10px] uppercase font-black tracking-wider bg-neon-blue/20 text-neon-blue-soft px-2 py-0.5 rounded">Team 1</span>}
+          {team === 2 && <span className="text-[10px] uppercase font-black tracking-wider bg-neon-pink/20 text-neon-pink px-2 py-0.5 rounded">Team 2</span>}
+          {eliminated && <span className="text-neon-pink text-[10px] uppercase font-black tracking-wider bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
         </span>
         
         {isWinner ? (
@@ -82,7 +86,6 @@ function DeadwoodRow({
       </div>
       
       <div className="flex flex-col gap-3">
-        {/* Render Formed Melds / Runs for ALL players */}
         {melds && melds.length > 0 && (
           <div className="flex flex-wrap gap-4">
             {melds.map((meld, mIdx) => (
@@ -97,7 +100,6 @@ function DeadwoodRow({
           </div>
         )}
         
-        {/* Render Leftover Deadwood or Captured Cards */}
         {showCards && (
           <motion.div variants={container} initial="hidden" animate="show" className={`flex flex-wrap gap-2 mt-1 p-2 border rounded-lg ${isPishpirikGame ? 'bg-blue-900/20 border-blue-900/40' : 'bg-red-900/20 border-red-900/40'}`}>
             <span className={`w-full text-xs uppercase tracking-widest font-bold mb-1 ${isPishpirikGame ? 'text-blue-400' : 'text-red-400'}`}>{cardsLabel}</span>
@@ -119,7 +121,7 @@ function DeadwoodRow({
   );
 }
 
-export default function RoundEndReveal({ gameState, isHost, onNextRound, onRestartMatch, onLeave }: Props) {
+export default function RoundEndReveal({ room, gameState, isHost, onNextRound, onRestartMatch, onLeave }: Props) {
   const [phase, setPhase] = useState<"smash" | "counting">("smash");
 
   useEffect(() => {
@@ -157,7 +159,6 @@ export default function RoundEndReveal({ gameState, isHost, onNextRound, onResta
             {ginLabel}
           </motion.div>
 
-          {/* Winner's Hand Display (Only for Zhol) */}
           {!isPishpirikGame && (
             <motion.div
               initial={{ opacity: 0, y: 50 }}
@@ -180,7 +181,6 @@ export default function RoundEndReveal({ gameState, isHost, onNextRound, onResta
             </motion.div>
           )}
 
-          {/* Background Scattered Cards (Force of the Gin) */}
           {[...Array(20)].map((_, i) => (
             <motion.div
               key={i}
@@ -200,7 +200,6 @@ export default function RoundEndReveal({ gameState, isHost, onNextRound, onResta
           ))}
         </div>
       ) : (
-        /* The Counting Panel */
         <motion.div 
           initial={{ opacity: 0, y: 50, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -220,6 +219,9 @@ export default function RoundEndReveal({ gameState, isHost, onNextRound, onResta
               const isMe = p.seatIdx === gameState.yourSeat;
               const name = isMe ? "You" : opp?.nickname || `Seat ${p.seatIdx + 1}`;
               const isWinner = p.seatIdx === gameState.lastRoundEnd!.winnerIdx;
+              
+              // NEW: Fetch Team Info
+              const team = room.seats[p.seatIdx]?.team;
 
               return (
                 <DeadwoodRow 
@@ -231,6 +233,7 @@ export default function RoundEndReveal({ gameState, isHost, onNextRound, onResta
                   eliminated={p.eliminated}
                   isWinner={isWinner}
                   isPishpirikGame={isPishpirikGame}
+                  team={team} // NEW: Pass down the team
                 />
               );
             })}
