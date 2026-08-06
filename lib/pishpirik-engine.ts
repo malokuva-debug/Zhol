@@ -11,6 +11,7 @@ export function parseCard(id: CardId): { rank: Rank; suit: Suit } {
  * 2C = 1, 10D = 2, 10-A = 1
  */
 export function parseCardId(id: string) {
+  // Handles deck suffixes if present (e.g., "10D_1" -> "10D")
   const base = id.split("_")[0];
   return { rank: base.slice(0, -1), suit: base.slice(-1) };
 }
@@ -31,11 +32,15 @@ export function checkPishpirikCapture(playedCardId: string, tablePile: string[])
     captures = true;
   }
 
-  // Pishpirik happens if there is EXACTLY 1 card on the table and we captured it
+  // Authentic Pishpirik Rule:
+  // You only get a Pishpirik if the ranks match EXACTLY.
+  // Playing a Jack on a single non-Jack card is just a capture, NOT a Pishpirik!
   if (captures && tablePile.length === 1) {
-    isPishpirik = true;
-    if (played.rank === "J" && topTable.rank === "J") {
-      isJackPishpirik = true;
+    if (played.rank === topTable.rank) {
+      isPishpirik = true;
+      if (played.rank === "J") {
+        isJackPishpirik = true; // Jack on Jack = 20 pts bonus
+      }
     }
   }
 
@@ -44,14 +49,22 @@ export function checkPishpirikCapture(playedCardId: string, tablePile: string[])
 
 export function scorePishpirikCards(capturedCards: string[]) {
   let score = 0;
+  
   for (const cardId of capturedCards) {
     const { rank, suit } = parseCardId(cardId);
     
-    if (rank === "2" && suit === "C") score += 1;
-    else if (rank === "10" && suit === "D") score += 2;
-    else if (rank === "10") score += 1; // 10H, 10S, 10C
-    else if (["J", "Q", "K", "A"].includes(rank)) score += 1;
+    // EXACT counting rules requested:
+    if (rank === "2" && suit === "C") {
+      score += 1;
+    } else if (rank === "10" && suit === "D") {
+      score += 2;
+    } else if (rank === "10") {
+      score += 1; // 10H, 10C, 10S
+    } else if (rank === "J" || rank === "Q" || rank === "K" || rank === "A") {
+      score += 1; // All suits for J, Q, K, A
+    }
   }
+
   return score;
 }
 
