@@ -3,31 +3,6 @@ import { freshDeckIds, minimizeDeadwood, isJokerId, makeCard } from "./gin-engin
 
 const RECONNECT_WINDOW_MS = 60_000;
 
-export function enforceTeamAssignments(room: Room) {
-  // STRICT CHECK: Only apply 2v2 if it is Pishpirik, set to 2v2, with 4 players.
-  if (
-    room.rules.gameMode === "pishpirik" && 
-    room.rules.teamMode === "2v2" && 
-    room.maxPlayers === 4
-  ) {
-    room.seats.forEach((seat, index) => {
-      if (seat) {
-        // Player 1 (Index 0) and Player 3 (Index 2) are Team 1
-        // Player 2 (Index 1) and Player 4 (Index 3) are Team 2
-        seat.team = (index === 0 || index === 2) ? 1 : 2;
-      }
-    });
-  } else {
-    // CLEANUP: If it's Zhol or Cicmic, completely remove team assignments 
-    // so the frontend falls back to the standard free-for-all layout.
-    room.seats.forEach((seat) => {
-      if (seat) {
-        delete seat.team;
-      }
-    });
-  }
-}
-
 export function newRoom(opts: {
   name: string;
   visibility: "public" | "private";
@@ -176,6 +151,24 @@ export function startGame(room: Room) {
   room.status = "playing";
   initializeGame(room);
   addSystemMessage(room, "The match has started!");
+}
+
+export function enforceTeamAssignments(room: Room) {
+  // STRICT: 4-Player Pishpirik is ALWAYS 2v2 Teams!
+  if (room.rules.gameMode === "pishpirik" && room.maxPlayers === 4) {
+    room.rules.teamMode = "2v2";
+    room.seats.forEach((seat, index) => {
+      if (seat) {
+        // Player 1 (seat 0) & Player 3 (seat 2) = Team 1
+        // Player 2 (seat 1) & Player 4 (seat 3) = Team 2
+        seat.team = (index === 0 || index === 2) ? 1 : 2;
+      }
+    });
+  } else {
+    room.seats.forEach((seat) => {
+      if (seat) delete seat.team;
+    });
+  }
 }
 
 export function initializeGame(room: Room) {
