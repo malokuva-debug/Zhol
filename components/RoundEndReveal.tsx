@@ -172,7 +172,7 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
 
       return {
         key: `team-${teamNum}`,
-        name: names,
+        name: `${names} Team`, // <--- ADDED " Team" HERE
         deadwood: teamPlayers.reduce((sum, p) => sum + p.deadwood, 0), // Combine Scores
         deadCards: teamPlayers.flatMap(p => p.deadCards || []),        // Combine Cards
         melds: teamPlayers.flatMap(p => p.melds || []),                // Combine Melds
