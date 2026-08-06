@@ -3,6 +3,20 @@ import { freshDeckIds, minimizeDeadwood, isJokerId, makeCard } from "./gin-engin
 
 const RECONNECT_WINDOW_MS = 60_000;
 
+// lib/room-logic.ts
+
+export function enforceTeamAssignments(room: Room) {
+  if (room.rules.teamMode === "2v2" && room.maxPlayers === 4) {
+    room.seats.forEach((seat, index) => {
+      if (seat) {
+        // Player 1 (Index 0) and Player 3 (Index 2) are Team 1
+        // Player 2 (Index 1) and Player 4 (Index 3) are Team 2
+        seat.team = (index === 0 || index === 2) ? 1 : 2;
+      }
+    });
+  }
+}
+
 export function newRoom(opts: {
   name: string;
   visibility: "public" | "private";
