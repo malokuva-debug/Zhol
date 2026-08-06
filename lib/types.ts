@@ -80,15 +80,15 @@ export interface SeatState {
 export type TurnPhase = "draw" | "discard" | "round_over";
 
 export interface RoundEndInfo {
-  type: GinType;
+  type: GinType | "PISHPIRIK"; // <-- Allow Gin types OR Pishpirik
   winnerIdx: number;
-  winnerMelds: Meld[];
+  winnerMelds?: any[]; // <-- Made optional because Pishpirik doesn't use melds!
   winnerBonus: number;
   pointsBySeat: {
       seatIdx: number;
       deadwood: number;
       deadCards: string[];
-      melds?: any[]; // <--- ADD THIS LINE
+      melds?: any[];
       eliminated: boolean;
     }[];
 }
