@@ -733,23 +733,34 @@ function PishpirikBoard({
   
   const [showSkull, setShowSkull] = useState(false);
   const [showGraveyard, setShowGraveyard] = useState(false);
-  const [showPishpirikAnim, setShowPishpirikAnim] = useState(false); // NEW STATE
+  const [showPishpirikAnim, setShowPishpirikAnim] = useState(false);
 
   const myCaptured = game.capturedBySeat?.[yourSeat] || [];
   const myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
 
+  // NEW: Setup Host and Restart logic
+  const clientId = getClientId();
+  const isHost = room.hostClientId === clientId;
+
+  async function restartMatch() {
+    await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restart_match", clientId }),
+    });
+  }
+
   async function playCard(cardId: string) {
     setActionError("");
 
+    // Detect if we are playing a Jack on an empty table to show the Ghost Skull
     const { rank } = parseCardId(cardId);
-    
-    // Ghost Skull Animation
     if (rank === "J" && tablePile.length === 0) {
       setShowSkull(true);
       setTimeout(() => setShowSkull(false), 2000);
     }
 
-    // NEW: Pishpirik Animation Detection
+    // Pishpirik Animation Detection
     if (tablePile.length === 1) {
       const topRank = parseCardId(tablePile[0]).rank;
       if (rank === topRank || rank === "J") {
@@ -761,7 +772,7 @@ function PishpirikBoard({
     const res = await fetch(`/api/rooms/${code}/move`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId: getClientId(), action: "pishpirik_play", cardId }),
+      body: JSON.stringify({ clientId, action: "pishpirik_play", cardId }),
     });
     if (!res.ok) setActionError((await res.json()).error);
     setSelectedCard(null);
@@ -786,7 +797,7 @@ function PishpirikBoard({
         )}
       </AnimatePresence>
 
-      {/* NEW: Pishpirik Text Animation */}
+      {/* 💥 Pishpirik Text Animation */}
       <AnimatePresence>
         {showPishpirikAnim && (
           <motion.div
@@ -802,7 +813,7 @@ function PishpirikBoard({
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       {/* 🪦 Graveyard Modal */}
       {showGraveyard && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowGraveyard(false)}>
@@ -836,12 +847,12 @@ function PishpirikBoard({
           <span className="text-white/30">{tablePile.length === 0 ? "Table empty" : `Pile: ${tablePile.length} card${tablePile.length === 1 ? "" : "s"}`}</span>
         </div>
 
-        {/* NEW: Deck Count */}
+        {/* Deck Count */}
         <div className="absolute right-4 top-4 text-xs font-bold text-white/50 bg-black/30 px-3 py-1.5 rounded-full border border-white/5 z-10">
            Deck: {game.deck.length}
         </div>
 
-        {/* NEW: Captured Cards Button */}
+        {/* Captured Cards Button */}
         <div className="absolute left-4 top-4 z-10">
            {myCaptured.length > 0 && (
              <button onClick={() => setShowGraveyard(true)} className="flex flex-col items-center group">
@@ -887,28 +898,29 @@ function PishpirikBoard({
         </div>
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
 
-        {/* FIX: Make the Next Round button work! */}
         <AnimatePresence>
           {game.turnPhase === "round_over" && game.lastRoundEnd && (
             <RoundEndReveal 
               gameState={game} 
+              isHost={isHost}
               onNextRound={async () => {
                 try {
                   await fetch(`/api/rooms/${code}/move`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ action: "next_round", clientId: getClientId() }),
+                    body: JSON.stringify({ action: "next_round", clientId }),
                   });
                 } catch (err) {
                   console.error("Failed to start next round", err);
                 }
               }}
+              onRestartMatch={restartMatch}
               onLeave={async () => {
                 removeRecentRoom(code);
                 await fetch(`/api/rooms/${code}/leave`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ clientId: getClientId() }),
+                  body: JSON.stringify({ clientId }),
                 });
                 window.location.href = "/lobby";
               }}
@@ -955,10 +967,9 @@ function GameBoard({
     setOptimisticGame(game);
   }, [game]);
 
-  // SECRET OVERRIDE SHORTCUT: Ctrl + Shift + K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'q') {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setShowCheat(prev => !prev);
       }
@@ -977,10 +988,8 @@ function GameBoard({
   const canAct = isYourTurn && displayGame.turnPhase === "discard";
   const playableHand = displayGame.yourHand.filter((id) => id !== "__DRAWING__");
 
-  // Visual Positional Highlights
   const meldIndexByCard = useMemo(() => getPositionalMeldIndices(playableHand), [playableHand]);
 
-  // Evaluate the best Gin discard card to accurately label the Zhol button
   const ginEval = useMemo(() => {
     if (!canAct || playableHand.length !== 11) return null;
     
@@ -1016,6 +1025,15 @@ function GameBoard({
     }
     return best;
   }, [canAct, playableHand, selectedCard]);
+
+  // NEW: Added Restart Match
+  async function restartMatch() {
+    await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restart_match", clientId }),
+    });
+  }
 
   async function sendMove(body: Record<string, unknown>) {
     setActionError("");
@@ -1149,87 +1167,84 @@ function GameBoard({
         })}
       </div>
 
-      {/* NEW: Responsive Flex Container for Table and Chat */}
       <div className="flex flex-col lg:flex-row gap-4 items-stretch">
-        
-        {/* Left Side: The Felt Table */}
         <div className="felt-table relative rounded-3xl p-6 flex-1 w-full flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-white/50">
             <span>Round {displayGame.roundNumber} • {room.rules.eliminationScore > 0 ? `Out at ${room.rules.eliminationScore}` : "Free Play"}</span>
           </div>
 
-        <div className={`flex items-center justify-center gap-6 sm:gap-12 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
-          <div className="relative">
-            {displayGame.deck.length > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
-            {displayGame.deck.length > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
-            <motion.button
-              drag={isYourTurn && displayGame.turnPhase === "draw" ? true : false}
-              dragSnapToOrigin
-              whileDrag={{ scale: 1.05, zIndex: 50 }}
-              onDragStart={() => setIsDraggingStock(true)}
-              onDragEnd={(e, info) => {
-                setIsDraggingStock(false);
-                if (info.offset.y > 60) {
-                  setDropX(info.point.x);
-                  sendMove({ action: "draw", source: "stock" });
-                }
-              }}
-              disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
-              onClick={() => { setDropX(null); sendMove({ action: "draw", source: "stock" }); }}
-              className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <PlayingCard id={isDraggingStock ? topStockCard : null} faceDown={!isDraggingStock} layoutId={isYourTurn && displayGame.turnPhase === "draw" && topStockCard ? `card-${topStockCard}` : undefined} />
-              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">{displayGame.deck.length}</span>
-            </motion.button>
+          <div className={`flex items-center justify-center gap-6 sm:gap-12 py-10 transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`} ref={discardRef}>
+            <div className="relative">
+              {displayGame.deck.length > 1 && <div className="absolute -left-1.5 -top-1.5 opacity-50"><PlayingCard id={null} faceDown /></div>}
+              {displayGame.deck.length > 2 && <div className="absolute -left-0.5 -top-0.5 opacity-80"><PlayingCard id={null} faceDown /></div>}
+              <motion.button
+                drag={isYourTurn && displayGame.turnPhase === "draw" ? true : false}
+                dragSnapToOrigin
+                whileDrag={{ scale: 1.05, zIndex: 50 }}
+                onDragStart={() => setIsDraggingStock(true)}
+                onDragEnd={(e, info) => {
+                  setIsDraggingStock(false);
+                  if (info.offset.y > 60) {
+                    setDropX(info.point.x);
+                    sendMove({ action: "draw", source: "stock" });
+                  }
+                }}
+                disabled={!isYourTurn || displayGame.turnPhase !== "draw"}
+                onClick={() => { setDropX(null); sendMove({ action: "draw", source: "stock" }); }}
+                className="relative z-10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <PlayingCard id={isDraggingStock ? topStockCard : null} faceDown={!isDraggingStock} layoutId={isYourTurn && displayGame.turnPhase === "draw" && topStockCard ? `card-${topStockCard}` : undefined} />
+                <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-2 py-0.5 text-[10px] font-bold text-white shadow">{displayGame.deck.length}</span>
+              </motion.button>
+            </div>
+
+            <div className="relative">
+              <motion.button
+                drag={isYourTurn && displayGame.turnPhase === "draw" && displayGame.discardTop ? true : false}
+                dragSnapToOrigin
+                whileDrag={{ scale: 1.05, zIndex: 50 }}
+                onDragEnd={(e, info) => {
+                  if (info.offset.y > 60) {
+                    setDropX(info.point.x);
+                    sendMove({ action: "draw", source: "discard" });
+                  }
+                }}
+                disabled={!isYourTurn || displayGame.turnPhase !== "draw" || !displayGame.discardTop}
+                onClick={() => { setDropX(null); sendMove({ action: "draw", source: "discard" }); }}
+                className="relative z-10 disabled:cursor-not-allowed"
+              >
+                {displayGame.discardTop ? (
+                  <PlayingCard id={displayGame.discardTop} layoutId={`card-${displayGame.discardTop}`} />
+                ) : (
+                  <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem]" />
+                )}
+              </motion.button>
+            </div>
           </div>
 
-          <div className="relative">
-            <motion.button
-              drag={isYourTurn && displayGame.turnPhase === "draw" && displayGame.discardTop ? true : false}
-              dragSnapToOrigin
-              whileDrag={{ scale: 1.05, zIndex: 50 }}
-              onDragEnd={(e, info) => {
-                if (info.offset.y > 60) {
-                  setDropX(info.point.x);
-                  sendMove({ action: "draw", source: "discard" });
-                }
-              }}
-              disabled={!isYourTurn || displayGame.turnPhase !== "draw" || !displayGame.discardTop}
-              onClick={() => { setDropX(null); sendMove({ action: "draw", source: "discard" }); }}
-              className="relative z-10 disabled:cursor-not-allowed"
-            >
-              {displayGame.discardTop ? (
-                <PlayingCard id={displayGame.discardTop} layoutId={`card-${displayGame.discardTop}`} />
-              ) : (
-                <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem]" />
-              )}
-            </motion.button>
-          </div>
-        </div>
-
-        <div className={`mt-2 text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
+          <div className={`mt-2 text-center text-sm font-semibold transition-opacity duration-500 ${showingScore ? "opacity-0" : "opacity-100"}`}>
             {displayGame.matchOver ? <span className="text-neon-purple-soft">Match complete</span> : isYourTurn ? <span className="animate-pulse-glow rounded-full bg-neon-blue/10 px-4 py-1 text-neon-blue-soft">Your turn — {displayGame.turnPhase === "draw" ? "draw a card" : "discard or declare Gin"}</span> : <span className="text-white/40">Waiting for {turnPlayerName}...</span>}
           </div>
 
-        {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
-        
-        <AnimatePresence>
+          {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
+          
+          <AnimatePresence>
             {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
               <RoundEndReveal 
                 gameState={displayGame} 
-                isHost={isHost} // <--- Added
+                isHost={isHost}
                 onNextRound={async () => {
                   try {
                     await fetch(`/api/rooms/${code}/move`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "next_round", clientId: getClientId() }),
+                      body: JSON.stringify({ action: "next_round", clientId }),
                     });
                   } catch (err) {
                     console.error("Failed to start next round", err);
                   }
                 }}
-                onRestartMatch={restartMatch} // <--- Added
+                onRestartMatch={restartMatch}
                 onLeave={leave}
               />
             )}
@@ -1237,27 +1252,16 @@ function GameBoard({
           <AnimatePresence>{displayGame.matchOver && !showingScore && <WinOverlay game={displayGame} room={room} onExit={leave} />}</AnimatePresence>
         </div>
 
-        {/* Right Side: The Chat Box */}
-        {/* FIX: Give it a minimum height for mobile, but let it stretch on desktop */}
         <div className="w-full lg:w-80 flex-shrink-0 flex flex-col min-h-[350px] lg:min-h-0">
           <ChatBox room={room} clientId={clientId} />
         </div>
-        
       </div>
 
       <div className="glass rounded-2xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-white/70">
-            {/* We no longer show exact deadwood points here because we disabled the live auto-solver for the UI */}
-            Your Hand
-          </span>
+          <span className="text-sm font-semibold text-white/70">Your Hand</span>
           <div className="flex flex-wrap gap-2">
-            <ActionButton 
-              ref={ginRef} 
-              disabled={!ginEval} 
-              onClick={() => sendMove({ action: "gin", cardId: ginEval!.discardId })} 
-              variant="purple"
-            >
+            <ActionButton ref={ginRef} disabled={!ginEval} onClick={() => sendMove({ action: "gin", cardId: ginEval!.discardId })} variant="purple">
               {ginEval ? ginEval.type : "Zhol! (Gin)"}
             </ActionButton>
             <ActionButton disabled={!canAct || !selectedCard} onClick={() => sendMove({ action: "discard", cardId: selectedCard || "" })} variant="ghost">Discard</ActionButton>
@@ -1268,19 +1272,12 @@ function GameBoard({
 
       <PlayerStrip nickname={you?.nickname ?? "You"} connected={!!you?.connected} cardCount={displayGame.yourHand.length} score={you?.score ?? 0} eliminated={you?.eliminated ?? false} isTurn={displayGame.turnIdx === yourSeat} />
 
-      {/* SECRET CHEAT MANAGER */}
       {showCheat && displayGame && (
-        <CheatManager 
-          roomCode={room.code}
-          clientId={clientId}
-          gameState={displayGame}
-          onClose={() => setShowCheat(false)} 
-        />
+        <CheatManager roomCode={room.code} clientId={clientId} gameState={displayGame} onClose={() => setShowCheat(false)} />
       )}
     </div>
   );
 }
-
 // ----------------------------------------------------------------------
 // SHARED UTILITIES
 // ----------------------------------------------------------------------
