@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoom, saveRoom } from "@/lib/store";
-import { applyDraw, applyDiscard, applyGin, startNextRound, addChatMessage } from "@/lib/room-logic";
+import { applyDraw, applyDiscard, applyGin, startNextRound, addChatMessage, restartMatch } from "@/lib/room-logic";
 import { formsMill, hasNonMillPieces, hasLegalMoves, CICMIC_ADJACENCY, CICMIC_DESTROYED } from "@/lib/cicmic-engine";
 import { checkPishpirikCapture, scorePishpirikCards } from "@/lib/pishpirik-engine";
 import { publishRoomUpdate } from "@/lib/pusher";
@@ -11,6 +11,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
+  z.object({ action: z.literal("restart_match"), clientId: z.string() }), // NEW ACTION
   z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
   z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }),
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
@@ -23,6 +24,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   const { code } = await params;
   const body = await req.json().catch(() => null);
   const parsed = Schema.safeParse(body);
+
+  if (parsed.data.action === "restart_match") {
+    if (room.hostClientId !== parsed.data.clientId) {
+      return NextResponse.json({ error: "Only the host can restart the match." }, { status: 403 });
+    }
+    restartMatch(room);
+    await saveRoom(room);
+    await publishRoomUpdate(room.code);
+    return NextResponse.json({ ok: true });
+  }
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request payload." }, { status: 400 });
