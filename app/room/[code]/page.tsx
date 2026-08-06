@@ -1210,10 +1210,15 @@ function GameBoard({
         {dealState && dealState.round === displayGame.roundNumber && <DealAnimation targets={dealState.targets} onComplete={() => setDealState(null)} />}
       </AnimatePresence>
 
-      <div className="relative h-48 sm:h-56">
-        {displayGame.opponents.map((opp, i) => {
-          const pos = seatPosition(i, displayGame.opponents.length);
+      <div className="relative h-48 sm:h-56 z-20">
+        {displayGame.opponents.map((opp) => {
+          // Calculate strict relative position so teammates sit across from each other
+          const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
+          const visualIndex = relIdx - 1;
+          const pos = seatPosition(visualIndex, room.maxPlayers - 1);
+          
           const oppClientId = room.seats[opp.seatIdx]?.clientId;
+          
           return (
             <div key={opp.seatIdx} className="absolute -translate-x-1/2 -translate-y-1/2 space-y-1" style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>
               <PlayerStrip 
@@ -1223,15 +1228,26 @@ function GameBoard({
                 score={opp.score} 
                 eliminated={opp.eliminated} 
                 isTurn={displayGame.turnIdx === opp.seatIdx} 
-                faceDown 
-                team={opp.team} /* NEW */ 
+                faceDown={false} 
+                team={opp.team} 
               />
+              
               {isHost && oppClientId && (
                 <button onClick={() => kickPlayer(oppClientId)} className="mx-auto block w-3/4 rounded bg-neon-pink/20 py-0.5 text-[10px] font-bold uppercase tracking-wider text-neon-pink transition hover:bg-neon-pink/30">
                   Kick
                 </button>
               )}
-              {!opp.eliminated && <div className="flex justify-center"><OpponentFan count={showingScore ? 0 : opp.cardCount} /></div>}
+              
+              {/* Show actual opponent cards! */}
+              {!opp.eliminated && !showingScore && opp.hand && (
+                <div className="flex justify-center -space-x-3 pt-2">
+                  {opp.hand.map((cardId, cIdx) => (
+                    <div key={cIdx} className="transform transition-transform hover:-translate-y-2 hover:z-30 shadow-md">
+                      <PlayingCard id={cardId} small />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -1413,4 +1429,12 @@ function WinOverlay({ game, room, onExit }: { game: ClientGameState; room: Omit<
       <button onClick={onExit} className="glow-blue rounded-xl bg-gradient-to-r from-neon-blue to-neon-purple px-6 py-2.5 font-bold text-black">Back to Lobby</button>
     </motion.div>
   );
+}
+
+function seatPosition(visualIndex: number, totalOpponentSeats: number): { x: number; y: number } {
+  const totalSeats = totalOpponentSeats + 1;
+  const angleStep = 360 / totalSeats;
+  const angleDeg = 90 + angleStep * (visualIndex + 1);
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: 50 + 42 * Math.cos(rad), y: 50 + 40 * Math.sin(rad) };
 }
