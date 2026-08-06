@@ -1,7 +1,10 @@
+// Inside app/api/rooms/[code]/join/route.ts
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoom, saveRoom } from "@/lib/store";
-import { tryJoinRoom } from "@/lib/room-logic";
+// 1. ADD enforceTeamAssignments TO YOUR IMPORTS
+import { tryJoinRoom, enforceTeamAssignments } from "@/lib/room-logic";
 import { publishRoomUpdate, publishLobbyUpdate } from "@/lib/pusher";
 
 const JoinSchema = z.object({
@@ -21,6 +24,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
   const result = tryJoinRoom(room, parsed.data.nickname, parsed.data.clientId, parsed.data.password);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+
+  // 2. NEW: ENFORCE TEAMS IMMEDIATELY AFTER SEATING THE PLAYER
+  enforceTeamAssignments(room);
 
   await saveRoom(room);
   await publishRoomUpdate(room.code);
