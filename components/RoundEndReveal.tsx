@@ -138,6 +138,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
   
   // Format the visual label based on the specific Zhol achieved
   const ginLabel = 
+    type === "PISHPIRIK" ? "PISHPIRIK!" : 
     type === "suit_joker_gin" ? "SUIT & JOKER ZHOL!" : 
     type === "suit_gin" ? "SUIT ZHOL!" : 
     type === "joker_gin" ? "JOKER ZHOL!" : 
