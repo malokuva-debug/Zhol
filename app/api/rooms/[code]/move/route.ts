@@ -11,7 +11,7 @@ const Schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("discard"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("gin"), clientId: z.string(), cardId: z.string() }),
   z.object({ action: z.literal("next_round"), clientId: z.string() }),
-  z.object({ action: z.literal("restart_match"), clientId: z.string() }), // NEW ACTION
+  z.object({ action: z.literal("restart_match"), clientId: z.string() }),
   z.object({ action: z.literal("cheat_set_hand"), clientId: z.string(), newHand: z.array(z.string()) }),
   z.object({ action: z.literal("chat"), clientId: z.string(), text: z.string() }),
   z.object({ action: z.literal("pishpirik_play"), clientId: z.string(), cardId: z.string() }),
@@ -25,16 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   const body = await req.json().catch(() => null);
   const parsed = Schema.safeParse(body);
 
-  if (parsed.data.action === "restart_match") {
-    if (room.hostClientId !== parsed.data.clientId) {
-      return NextResponse.json({ error: "Only the host can restart the match." }, { status: 403 });
-    }
-    restartMatch(room);
-    await saveRoom(room);
-    await publishRoomUpdate(room.code);
-    return NextResponse.json({ ok: true });
-  }
-
+  // MUST BE FIRST! Validates the payload exists before touching `parsed.data`
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request payload." }, { status: 400 });
   }
@@ -51,6 +42,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
   // --- ACTIONS THAT CAN BE DONE ANYTIME ---
   
+  if (parsed.data.action === "restart_match") {
+    if (room.hostClientId !== parsed.data.clientId) {
+      return NextResponse.json({ error: "Only the host can restart the match." }, { status: 403 });
+    }
+    restartMatch(room);
+    await saveRoom(room);
+    await publishRoomUpdate(room.code);
+    return NextResponse.json({ ok: true });
+  }
+
   if (parsed.data.action === "next_round") {
     if (room.game.turnPhase === "round_over" && !room.game.matchOver) {
       startNextRound(room);
@@ -68,34 +69,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ ok: true });
   }
 
-  // FIX: Handled properly and defensively mapped for older rooms
   if (parsed.data.action === "chat") {
-    const seat = room.seats[seatIdx];
+    if (!room.chat) room.chat = []; // Safe fallback for rooms generated before chat existed
     
-    // 1. GUARANTEE the chat array exists before pushing
-    if (!room.chat) {
-      room.chat = [];
-    }
+    const result = addChatMessage(room, parsed.data.clientId, parsed.data.text);
+    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
 
-    if (seat && parsed.data.text.trim().length > 0) {
-      room.chat.push({
-        id: Math.random().toString(36).substring(2, 10),
-        kind: "chat",
-        nickname: seat.nickname,
-        text: parsed.data.text.slice(0, 150).trim(),
-        at: Date.now()
-      });
-      
-      // Keep only the latest 50 messages
-      if (room.chat.length > 50) {
-        room.chat.shift();
-      }
-    }
-    
     await saveRoom(room);
     await publishRoomUpdate(room.code);
     return NextResponse.json({ ok: true });
   }
+
   // --- GAMEPLAY MOVES (Requires it to be your turn) ---
 
   if (room.game.turnIdx !== seatIdx) {
@@ -107,7 +91,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
   switch (parsed.data.action) {
     case "draw": {
       const seat = room.seats[seatIdx];
-      // FIX: Strict validation to prevent double-draws (9/12 card bug)
       if (seat && seat.hand.length !== 10) {
         result = { error: "Invalid move: You must have exactly 10 cards to draw." };
         break;
@@ -118,7 +101,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     
     case "discard": {
       const seat = room.seats[seatIdx];
-      // FIX: Strict validation to prevent double-discards (9/12 card bug)
       if (seat && seat.hand.length !== 11) {
         result = { error: "Invalid move: You must have exactly 11 cards to discard." };
         break;
@@ -129,7 +111,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     
     case "gin": {
       const seat = room.seats[seatIdx];
-      // FIX: Strict validation to ensure they drew before declaring Zhol
       if (seat && seat.hand.length !== 11) {
         result = { error: "Invalid move: You must have exactly 11 cards to declare Zhol." };
         break;
@@ -152,7 +133,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const tablePile = room.game.tablePile || [];
       const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       
-      const { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
+      let { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
+
+      if (captures && tablePile.length === 1) {
+        isPishpirik = true;
+      }
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
@@ -167,7 +152,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
           const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
           
-          // Find an enemy who has > 0 Pishpirik points to cancel out
           const enemyIdx = activeSeats.find((i) => i !== seatIdx && (pishMap[i] || 0) > 0);
 
           if (enemyIdx !== undefined) {
@@ -178,7 +162,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
                  pishMap[enemyIdx] = 0;
                  pishMap[seatIdx] = (pishMap[seatIdx] || 0) + (pishPts - enemyCurrent);
              } else {
-                 pishMap[enemyIdx] = 0; // Exact cancel
+                 pishMap[enemyIdx] = 0;
              }
           } else {
             pishMap[seatIdx] = (pishMap[seatIdx] || 0) + pishPts;
@@ -196,7 +180,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.seats[i]!.hand = room.game.deck.splice(0, 4);
           }
         } else {
-          // Round is completely over
           if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
             const remaining = room.game.tablePile;
             room.game.capturedBySeat[room.game.lastCaptureIdx] = [
@@ -234,7 +217,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
           room.game.turnPhase = "round_over";
           
-          // FIX: Handle Pishpirik Free Play vs Points Mode
           const isFreePlay = !room.rules.allowEliminations || room.rules.eliminationScore <= 0;
           const reachedScoreLimit = highestScore >= room.rules.eliminationScore;
 
