@@ -225,8 +225,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
             pointsBySeat.push({
                seatIdx: i,
-               deadwood: roundPoints, // Re-using this UI property to show points earned
-               deadCards: captured, // FIX: Send captured cards to the UI so everyone can see them!
+               deadwood: roundPoints, 
+               deadCards: captured, 
                melds: [],
                eliminated: false
             });
@@ -234,8 +234,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
           room.game.turnPhase = "round_over";
           
-          // FIX: Only end the MATCH if someone hit the score limit
-          if (room.rules.eliminationScore > 0 && highestScore >= room.rules.eliminationScore) {
+          // FIX: Handle Pishpirik Free Play vs Points Mode
+          const isFreePlay = !room.rules.allowEliminations || room.rules.eliminationScore <= 0;
+          const reachedScoreLimit = highestScore >= room.rules.eliminationScore;
+
+          if (isFreePlay || reachedScoreLimit) {
              room.game.matchOver = true; 
              room.game.matchWinnerIdx = winnerIdx;
           } else {
