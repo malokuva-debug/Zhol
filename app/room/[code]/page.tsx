@@ -1070,7 +1070,17 @@ function GameBoard({
             {displayGame.turnPhase === "round_over" && displayGame.lastRoundEnd && (
               <RoundEndReveal 
                 gameState={displayGame} 
-                onNextRound={/* ... */}
+                onNextRound={async () => {
+                  try {
+                    await fetch(`/api/rooms/${room.code}/move`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "next_round", clientId }),
+                    });
+                  } catch (err) {
+                    console.error("Failed to start next round", err);
+                  }
+                }}
                 onLeave={leave}
               />
             )}
