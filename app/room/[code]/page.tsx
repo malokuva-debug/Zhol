@@ -796,19 +796,17 @@ function PishpirikBoard({
   const [showGraveyard, setShowGraveyard] = useState(false);
   const [showPishpirikAnim, setShowPishpirikAnim] = useState(false);
 
-  const is2v2 = room.rules.teamMode === "2v2";
-  const myTeam = room.seats[yourSeat]?.team;
+  const is2v2 = room.rules.gameMode === "pishpirik" && room.maxPlayers === 4;
+  const myTeam = room.seats[yourSeat]?.team ?? (yourSeat % 2 === 0 ? 1 : 2);
 
   let myCaptured: string[] = [];
   let myPishPts = 0;
 
-  if (is2v2 && myTeam) {
-    room.seats.forEach((s, i) => {
-      if (s?.team === myTeam) {
-        myCaptured = [...myCaptured, ...(game.capturedBySeat?.[i] || [])];
-        myPishPts += (game.pishpiriksBySeat?.[i] || 0);
-      }
-    });
+  if (is2v2) {
+    // Shared Graveyard: Team 1 reads key 0, Team 2 reads key 1
+    const teamKey = myTeam === 1 ? 0 : 1;
+    myCaptured = game.capturedBySeat?.[teamKey] || [];
+    myPishPts = game.pishpiriksBySeat?.[teamKey] || 0;
   } else {
     myCaptured = game.capturedBySeat?.[yourSeat] || [];
     myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
