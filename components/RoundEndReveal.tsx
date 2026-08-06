@@ -159,20 +159,26 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
   }[] = [];
 
   if (is2v2) {
-    // Helper to merge teammates into a single row
+    // Helper to merge teammates into a single row with better formatting
     const buildTeamRow = (teamNum: 1 | 2) => {
       const teamPlayers = pointsBySeat.filter(p => room.seats[p.seatIdx]?.team === teamNum);
       if (teamPlayers.length === 0) return null;
 
-      const names = teamPlayers.map(p => {
+      // Build "Player 1 & Player 2" with their nicknames
+      const playerNames = teamPlayers.map(p => {
         const isMe = p.seatIdx === gameState.yourSeat;
         const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
-        return isMe ? "You" : (opp?.nickname || room.seats[p.seatIdx]?.nickname || `Seat ${p.seatIdx + 1}`);
-      }).join(" & ");
+        const nick = isMe ? "You" : (opp?.nickname || room.seats[p.seatIdx]?.nickname || `P${p.seatIdx + 1}`);
+        return nick;
+      });
+      
+      const teamDisplayName = playerNames.length === 2 
+        ? `${playerNames[0]} & ${playerNames[1]} Team`
+        : `${playerNames[0]} Team`;
 
       return {
         key: `team-${teamNum}`,
-        name: `${names} Team`, // <--- ADDED " Team" HERE
+        name: teamDisplayName,
         deadwood: teamPlayers.reduce((sum, p) => sum + p.deadwood, 0), // Combine Scores
         deadCards: teamPlayers.flatMap(p => p.deadCards || []),        // Combine Cards
         melds: teamPlayers.flatMap(p => p.melds || []),                // Combine Melds
@@ -298,17 +304,17 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full"
+            className="w-full space-y-2"
           >
             {!gameState.matchOver ? (
               <button 
                 onClick={onNextRound}
                 className="w-full py-3.5 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] cursor-pointer"
               >
-                Start Next Round
+                Next Round
               </button>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-3">
+              <>
                 {isHost && (
                   <button 
                     onClick={onRestartMatch}
@@ -323,7 +329,7 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
                 >
                   Back to Lobby
                 </button>
-              </div>
+              </>
             )}
           </motion.div>
         </motion.div>
