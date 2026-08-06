@@ -68,27 +68,6 @@ export function addSystemMessage(room: Room, msg: string) {
   room.updatedAt = Date.now();
 }
 
-export function addChatMessage(room: Room, clientId: string, text: string) {
-  const seat = room.seats.find((s) => s?.clientId === clientId);
-  if (!seat) return { error: "Player not found." };
-
-  room.chat.push({
-    id: Math.random().toString(36).substring(2, 10),
-    kind: "chat", // FIX: added 'kind' property
-    nickname: seat.nickname,
-    text: text.slice(0, 150).trim(),
-    at: Date.now(), // FIX: renamed 'timestamp' to 'at'
-  });
-
-  // Keep only the latest 50 messages so the room state doesn't get too large
-  if (room.chat.length > 50) {
-    room.chat.shift();
-  }
-  
-  room.updatedAt = Date.now();
-  return { ok: true };
-}
-
 export function tryJoinRoom(
   room: Room,
   nickname: string,
@@ -197,26 +176,6 @@ export function initializeGame(room: Room) {
     };
     return;
   }
-
-export function restartMatch(room: Room) {
-  room.seats.forEach((seat) => {
-    if (seat) {
-      seat.score = 0;
-      seat.eliminated = false;
-      seat.hand = [];
-    }
-  });
-  
-  if (room.game) {
-    room.game.matchOver = false;
-    room.game.matchWinnerIdx = undefined;
-    room.game.lastRoundEnd = undefined;
-  }
-
-  // Re-deal and reset all state for round 1
-  initializeGame(room);
-  addSystemMessage(room, "The match was restarted by the host.");
-}
 
   if (mode === "pishpirik") {
     const deck = generateStandardDeck();
@@ -361,7 +320,6 @@ export function applyDraw(room: Room, seatIdx: number, source: "stock" | "discar
   const seat = room.seats[seatIdx];
   if (!seat) return { error: "No seat." };
 
-  // FIX: Strict validation to prevent race conditions resulting in 9 or 12 cards
   if (seat.hand.length !== 10) {
     return { error: "Invalid move: You must have exactly 10 cards to draw." };
   }
@@ -387,7 +345,6 @@ export function applyDiscard(room: Room, seatIdx: number, cardId: string) {
   const seat = room.seats[seatIdx];
   if (!seat) return { error: "No seat." };
 
-  // FIX: Strict validation to prevent race conditions resulting in 9 or 12 cards
   if (seat.hand.length !== 11) {
     return { error: "Invalid move: You must have exactly 11 cards to discard." };
   }
@@ -419,13 +376,8 @@ export function startNextRound(room: Room) {
     .filter((i) => i !== -1);
 
   if (mode === "zhol") {
-    // ... (Keep your existing Zhol logic here) ...
-  } else if (mode === "pishpirik") {
-    // NEW: Deal a fresh round of Pishpirik
-    const deck = generateStandardDeck();
+    const deck = generateZholDeck(activeSeats.length);
     shuffle(deck);
-
-    const tablePile = deck.splice(0, 4);
 
     let starterSeat = activeSeats[0];
     const prevStarter = room.game.dealerIdx ?? activeSeats[0];
@@ -437,10 +389,6 @@ export function startNextRound(room: Room) {
         break;
       }
     }
-
-    activeSeats.forEach((seatIdx) => {
-      room.seats[seatIdx]!.hand = deck.splice(0, 4);
-    });
 
     activeSeats.forEach((seatIdx) => {
       const count = seatIdx === starterSeat ? 11 : 10;
@@ -463,13 +411,46 @@ export function startNextRound(room: Room) {
       turnPhase: "discard", 
       turnStartedAt: Date.now(),
       deck,
+      discard: topDiscard ? [topDiscard] : [],
+      discardTop: topDiscard,
+      matchOver: false,
+      dealerIdx: starterSeat,
+    };
+  } else if (mode === "pishpirik") {
+    const deck = generateStandardDeck();
+    shuffle(deck);
+
+    const tablePile = deck.splice(0, 4);
+
+    let starterSeat = activeSeats[0];
+    const prevStarter = room.game.dealerIdx ?? activeSeats[0];
+    
+    for (let i = 1; i <= room.seats.length; i++) {
+      const candidate = (prevStarter + i) % room.seats.length;
+      if (activeSeats.includes(candidate)) {
+        starterSeat = candidate;
+        break;
+      }
+    }
+
+    activeSeats.forEach((seatIdx) => {
+      room.seats[seatIdx]!.hand = deck.splice(0, 4);
+    });
+
+    room.game = {
+      ...room.game,
+      roundNumber: room.game.roundNumber + 1,
+      turnIdx: starterSeat,
+      turnPhase: "discard", 
+      turnStartedAt: Date.now(),
+      deck,
       discard: [],
       discardTop: null,
       matchOver: false,
       dealerIdx: starterSeat,
       tablePile,
-      capturedBySeat: {}, // Reset captures for the new round
-      pishpiriksBySeat: {}, // Reset pishpiriks
+      capturedBySeat: {}, 
+      pishpiriksBySeat: {}, 
     };
   }
 }
@@ -485,7 +466,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   const isJokerDiscard = isJokerId(cardId);
   
   const handCards = winnerSeat.hand.map(makeCard);
-  const hasJoker = handCards.some(c => c.isJoker);
   const nonJokers = handCards.filter(c => !c.isJoker);
   const firstSuit = nonJokers.length > 0 ? nonJokers[0].suit : null;
   const isSuitGin = nonJokers.length > 0 && nonJokers.every(c => c.suit === firstSuit);
@@ -509,7 +489,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   room.seats.forEach((seat, i) => {
     if (!seat || seat.eliminated) return;
 
-    // NEW: Calculate deadwood and melds for EVERY player (including the winner)
     const res = minimizeDeadwood(seat.hand);
     
     let deadwood = 0;
@@ -517,7 +496,6 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
 
     if (i === seatIdx) {
       seat.score -= winBonus;
-      // Winner has no deadwood points, but we still want to grab their `res.melds`
     } else {
       deadwood = res.deadwood;
       deadCards = res.deadCards;
@@ -533,7 +511,7 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
       seatIdx: i,
       deadwood,
       deadCards,
-      melds: res.melds, // NEW: Export the grouped melds for the UI
+      melds: res.melds, 
       eliminated: seat.eliminated
     });
   });
@@ -566,4 +544,43 @@ export function applyGin(room: Room, seatIdx: number, cardId: string) {
   }
 
   return { ok: true };
+}
+
+export function addChatMessage(room: Room, clientId: string, text: string) {
+  const seat = room.seats.find((s) => s?.clientId === clientId);
+  if (!seat) return { error: "Player not found." };
+
+  room.chat.push({
+    id: Math.random().toString(36).substring(2, 10),
+    kind: "chat",
+    nickname: seat.nickname,
+    text: text.slice(0, 150).trim(),
+    at: Date.now(),
+  });
+
+  if (room.chat.length > 50) {
+    room.chat.shift();
+  }
+  
+  room.updatedAt = Date.now();
+  return { ok: true };
+}
+
+export function restartMatch(room: Room) {
+  room.seats.forEach((seat) => {
+    if (seat) {
+      seat.score = 0;
+      seat.eliminated = false;
+      seat.hand = [];
+    }
+  });
+  
+  if (room.game) {
+    room.game.matchOver = false;
+    room.game.matchWinnerIdx = undefined;
+    room.game.lastRoundEnd = undefined;
+  }
+
+  initializeGame(room);
+  addSystemMessage(room, "The match was restarted by the host.");
 }
