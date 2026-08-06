@@ -399,8 +399,13 @@ export function startNextRound(room: Room) {
     .filter((i) => i !== -1);
 
   if (mode === "zhol") {
-    const deck = generateZholDeck(activeSeats.length);
+    // ... (Keep your existing Zhol logic here) ...
+  } else if (mode === "pishpirik") {
+    // NEW: Deal a fresh round of Pishpirik
+    const deck = generateStandardDeck();
     shuffle(deck);
+
+    const tablePile = deck.splice(0, 4);
 
     let starterSeat = activeSeats[0];
     const prevStarter = room.game.dealerIdx ?? activeSeats[0];
@@ -412,6 +417,10 @@ export function startNextRound(room: Room) {
         break;
       }
     }
+
+    activeSeats.forEach((seatIdx) => {
+      room.seats[seatIdx]!.hand = deck.splice(0, 4);
+    });
 
     activeSeats.forEach((seatIdx) => {
       const count = seatIdx === starterSeat ? 11 : 10;
@@ -434,10 +443,13 @@ export function startNextRound(room: Room) {
       turnPhase: "discard", 
       turnStartedAt: Date.now(),
       deck,
-      discard: topDiscard ? [topDiscard] : [],
-      discardTop: topDiscard,
+      discard: [],
+      discardTop: null,
       matchOver: false,
       dealerIdx: starterSeat,
+      tablePile,
+      capturedBySeat: {}, // Reset captures for the new round
+      pishpiriksBySeat: {}, // Reset pishpiriks
     };
   }
 }
