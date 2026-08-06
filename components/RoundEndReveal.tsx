@@ -145,56 +145,15 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
     "ZHOL!";
 
   // -------------------------------------------------------------
-  // ROW AGGREGATION LOGIC (INDIVIDUAL VS TEAMS)
+  // TEAM DISPLAY LOGIC
   // -------------------------------------------------------------
-  let displayRows: {
-    key: string;
-    name: string;
-    deadwood: number;
-    deadCards: string[];
-    melds: any[];
-    eliminated: boolean;
-    isWinner: boolean;
-    team?: 1 | 2;
-  }[] = [];
+  const team1Players = room.seats.filter(s => s?.team === 1).map(s => s!.nickname);
+  const team2Players = room.seats.filter(s => s?.team === 2).map(s => s!.nickname);
+  const team1Score = room.seats.find(s => s?.team === 1)?.score || 0;
+  const team2Score = room.seats.find(s => s?.team === 2)?.score || 0;
 
-  if (is2v2) {
-    // Helper to merge teammates into a single row with better formatting
-    const buildTeamRow = (teamNum: 1 | 2) => {
-      const teamPlayers = pointsBySeat.filter(p => room.seats[p.seatIdx]?.team === teamNum);
-      if (teamPlayers.length === 0) return null;
-
-      // Build "Player 1 & Player 2" with their nicknames
-      const playerNames = teamPlayers.map(p => {
-        const isMe = p.seatIdx === gameState.yourSeat;
-        const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
-        const nick = isMe ? "You" : (opp?.nickname || room.seats[p.seatIdx]?.nickname || `P${p.seatIdx + 1}`);
-        return nick;
-      });
-      
-      const teamDisplayName = playerNames.length === 2 
-        ? `${playerNames[0]} & ${playerNames[1]} Team`
-        : `${playerNames[0]} Team`;
-
-      return {
-        key: `team-${teamNum}`,
-        name: teamDisplayName,
-        deadwood: teamPlayers.reduce((sum, p) => sum + p.deadwood, 0), // Combine Scores
-        deadCards: teamPlayers.flatMap(p => p.deadCards || []),        // Combine Cards
-        melds: teamPlayers.flatMap(p => p.melds || []),                // Combine Melds
-        eliminated: teamPlayers.some(p => p.eliminated),               
-        isWinner: teamPlayers.some(p => p.seatIdx === gameState.lastRoundEnd!.winnerIdx),
-        team: teamNum
-      };
-    };
-
-    const t1 = buildTeamRow(1);
-    const t2 = buildTeamRow(2);
-    if (t1) displayRows.push(t1);
-    if (t2) displayRows.push(t2);
-
-  } else {
-    // Normal Free-For-All
+  let displayRows: any[] = [];
+  if (!is2v2) {
     displayRows = pointsBySeat.map((p) => {
       const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
       const isMe = p.seatIdx === gameState.yourSeat;
@@ -285,52 +244,72 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
           )}
           
           <div className="space-y-4 mb-8 mt-4">
-            {/* RENDER THE AGGREGATED DISPLAY ROWS */}
-            {displayRows.map((row) => (
-              <DeadwoodRow 
-                key={row.key}
-                name={row.name}
-                deadwood={row.deadwood}
-                deadCards={row.deadCards}
-                melds={row.melds}
-                eliminated={row.eliminated}
-                isWinner={row.isWinner}
-                isPishpirikGame={isPishpirikGame}
-                team={row.team}
-              />
-            ))}
+            {is2v2 ? (
+              <div className="flex flex-col gap-6 text-center w-full mx-auto">
+                <div className="bg-neon-blue/10 border border-neon-blue/30 p-6 rounded-xl shadow-[0_0_15px_rgba(77,216,255,0.2)]">
+                  <div className="text-lg font-bold text-white mb-2">
+                    {team1Players.join(" & ")} Team
+                  </div>
+                  <div className="text-4xl font-black text-neon-blue-soft">
+                    {team1Score} pts
+                  </div>
+                </div>
+
+                <div className="bg-neon-pink/10 border border-neon-pink/30 p-6 rounded-xl shadow-[0_0_15px_rgba(255,91,200,0.2)]">
+                  <div className="text-lg font-bold text-white mb-2">
+                    {team2Players.join(" & ")} Team
+                  </div>
+                  <div className="text-4xl font-black text-neon-pink">
+                    {team2Score} pts
+                  </div>
+                </div>
+              </div>
+            ) : (
+              displayRows.map((row) => (
+                <DeadwoodRow 
+                  key={row.key}
+                  name={row.name}
+                  deadwood={row.deadwood}
+                  deadCards={row.deadCards}
+                  melds={row.melds}
+                  eliminated={row.eliminated}
+                  isWinner={row.isWinner}
+                  isPishpirikGame={isPishpirikGame}
+                  team={row.team}
+                />
+              ))
+            )}
           </div>
 
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full space-y-2"
+            className="w-full flex flex-col gap-3"
           >
-            {!gameState.matchOver ? (
+            {isHost && !gameState.matchOver && (
               <button 
                 onClick={onNextRound}
-                className="w-full py-3.5 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] cursor-pointer"
+                className="w-full py-4 bg-gradient-to-r from-neon-blue to-neon-purple hover:opacity-90 text-black font-black uppercase tracking-widest text-lg rounded-xl transition shadow-[0_0_15px_rgba(163,91,255,0.3)] cursor-pointer"
               >
                 Next Round
               </button>
-            ) : (
-              <>
-                {isHost && (
-                  <button 
-                    onClick={onRestartMatch}
-                    className="w-full py-3.5 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(255,91,200,0.4)] cursor-pointer"
-                  >
-                    Play Again
-                  </button>
-                )}
-                <button 
-                  onClick={onLeave}
-                  className={`w-full py-3.5 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white font-bold text-lg rounded-xl transition cursor-pointer`}
-                >
-                  Back to Lobby
-                </button>
-              </>
             )}
+
+            {isHost && gameState.matchOver && (
+              <button 
+                onClick={onRestartMatch}
+                className="w-full py-4 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 text-white font-black uppercase tracking-widest text-lg rounded-xl transition shadow-[0_0_15px_rgba(255,91,200,0.4)] cursor-pointer"
+              >
+                Play Again
+              </button>
+            )}
+
+            <button 
+              onClick={onLeave}
+              className={`w-full py-4 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white font-bold uppercase tracking-widest text-lg rounded-xl transition cursor-pointer`}
+            >
+              Back to Lobby
+            </button>
           </motion.div>
         </motion.div>
       )}
