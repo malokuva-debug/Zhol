@@ -7,7 +7,7 @@ import { makeCard } from "@/lib/gin-engine";
 import PlayingCard from "./PlayingCard";
 
 interface Props {
-  room: Omit<Room, "passwordHash">; // NEW: Pass room to get team data
+  room: Omit<Room, "passwordHash">;
   gameState: ClientGameState;
   isHost: boolean;
   onNextRound: () => void;
@@ -46,7 +46,7 @@ function DeadwoodRow({
   eliminated, 
   isWinner,
   isPishpirikGame,
-  team // NEW PROP
+  team 
 }: { 
   name: string; 
   deadwood: number; 
@@ -68,7 +68,6 @@ function DeadwoodRow({
       <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
         <span className="text-slate-200 font-bold text-lg flex items-center gap-2">
           {name} 
-          {/* NEW: TEAM BADGES */}
           {team === 1 && <span className="text-[10px] uppercase font-black tracking-wider bg-neon-blue/20 text-neon-blue-soft px-2 py-0.5 rounded">Team 1</span>}
           {team === 2 && <span className="text-[10px] uppercase font-black tracking-wider bg-neon-pink/20 text-neon-pink px-2 py-0.5 rounded">Team 2</span>}
           {eliminated && <span className="text-neon-pink text-[10px] uppercase font-black tracking-wider bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
@@ -136,6 +135,7 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
 
   const { type, winnerBonus, pointsBySeat } = gameState.lastRoundEnd;
   const isPishpirikGame = type === "PISHPIRIK";
+  const is2v2 = room.rules.teamMode === "2v2";
   
   const ginLabel = 
     isPishpirikGame ? "PISHPIRIK!" : 
@@ -143,6 +143,71 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
     type === "suit_gin" ? "SUIT ZHOL!" : 
     type === "joker_gin" ? "JOKER ZHOL!" : 
     "ZHOL!";
+
+  // -------------------------------------------------------------
+  // ROW AGGREGATION LOGIC (INDIVIDUAL VS TEAMS)
+  // -------------------------------------------------------------
+  let displayRows: {
+    key: string;
+    name: string;
+    deadwood: number;
+    deadCards: string[];
+    melds: any[];
+    eliminated: boolean;
+    isWinner: boolean;
+    team?: 1 | 2;
+  }[] = [];
+
+  if (is2v2) {
+    // Helper to merge teammates into a single row
+    const buildTeamRow = (teamNum: 1 | 2) => {
+      const teamPlayers = pointsBySeat.filter(p => room.seats[p.seatIdx]?.team === teamNum);
+      if (teamPlayers.length === 0) return null;
+
+      const names = teamPlayers.map(p => {
+        const isMe = p.seatIdx === gameState.yourSeat;
+        const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
+        return isMe ? "You" : (opp?.nickname || room.seats[p.seatIdx]?.nickname || `Seat ${p.seatIdx + 1}`);
+      }).join(" & ");
+
+      return {
+        key: `team-${teamNum}`,
+        name: names,
+        deadwood: teamPlayers.reduce((sum, p) => sum + p.deadwood, 0), // Combine Scores
+        deadCards: teamPlayers.flatMap(p => p.deadCards || []),        // Combine Cards
+        melds: teamPlayers.flatMap(p => p.melds || []),                // Combine Melds
+        eliminated: teamPlayers.some(p => p.eliminated),               
+        isWinner: teamPlayers.some(p => p.seatIdx === gameState.lastRoundEnd!.winnerIdx),
+        team: teamNum
+      };
+    };
+
+    const t1 = buildTeamRow(1);
+    const t2 = buildTeamRow(2);
+    if (t1) displayRows.push(t1);
+    if (t2) displayRows.push(t2);
+
+  } else {
+    // Normal Free-For-All
+    displayRows = pointsBySeat.map((p) => {
+      const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
+      const isMe = p.seatIdx === gameState.yourSeat;
+      const name = isMe ? "You" : (opp?.nickname || room.seats[p.seatIdx]?.nickname || `Seat ${p.seatIdx + 1}`);
+      const isWinner = p.seatIdx === gameState.lastRoundEnd!.winnerIdx;
+      const team = room.seats[p.seatIdx]?.team;
+
+      return {
+        key: `seat-${p.seatIdx}`,
+        name,
+        deadwood: p.deadwood,
+        deadCards: p.deadCards || [],
+        melds: p.melds || [],
+        eliminated: p.eliminated,
+        isWinner,
+        team
+      };
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md">
@@ -214,29 +279,20 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
           )}
           
           <div className="space-y-4 mb-8 mt-4">
-            {pointsBySeat.map((p) => {
-              const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
-              const isMe = p.seatIdx === gameState.yourSeat;
-              const name = isMe ? "You" : opp?.nickname || `Seat ${p.seatIdx + 1}`;
-              const isWinner = p.seatIdx === gameState.lastRoundEnd!.winnerIdx;
-              
-              // NEW: Fetch Team Info
-              const team = room.seats[p.seatIdx]?.team;
-
-              return (
-                <DeadwoodRow 
-                  key={p.seatIdx}
-                  name={name}
-                  deadwood={p.deadwood}
-                  deadCards={p.deadCards || []}
-                  melds={p.melds || []}
-                  eliminated={p.eliminated}
-                  isWinner={isWinner}
-                  isPishpirikGame={isPishpirikGame}
-                  team={team} // NEW: Pass down the team
-                />
-              );
-            })}
+            {/* RENDER THE AGGREGATED DISPLAY ROWS */}
+            {displayRows.map((row) => (
+              <DeadwoodRow 
+                key={row.key}
+                name={row.name}
+                deadwood={row.deadwood}
+                deadCards={row.deadCards}
+                melds={row.melds}
+                eliminated={row.eliminated}
+                isWinner={row.isWinner}
+                isPishpirikGame={isPishpirikGame}
+                team={row.team}
+              />
+            ))}
           </div>
 
           <motion.div
