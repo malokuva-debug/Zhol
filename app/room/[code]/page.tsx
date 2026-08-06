@@ -295,7 +295,16 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
   return (
     <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <div>
-        <div className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">{room.name}</div>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">{room.name}</span>
+          
+          {/* NEW: Massive glowing 2v2 Team Badge at the top of the room! */}
+          {room.rules.teamMode === "2v2" && (
+            <span className="bg-gradient-to-r from-neon-blue to-neon-pink text-white text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded shadow-[0_0_15px_rgba(163,91,255,0.4)]">
+              2V2 Teams
+            </span>
+          )}
+        </div>
         <h1 className="text-2xl font-black text-glow-purple">Room {room.code}</h1>
       </div>
       <div className="flex gap-2">
@@ -317,7 +326,6 @@ function RoomHeader({ room, clientId }: { room: Omit<Room, "passwordHash">; clie
     </header>
   );
 }
-
 function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "passwordHash">; yourSeat: number | null; clientId: string; code: string; }) {
   const router = useRouter();
   const isHost = room.hostClientId === clientId;
