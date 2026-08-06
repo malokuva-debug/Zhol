@@ -322,9 +322,13 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
   const router = useRouter();
   const isHost = room.hostClientId === clientId;
   const occupied = room.seats.filter(Boolean);
-  const bothReady = occupied.every((s) => s?.ready);
+  const bothReady = occupied.length > 0 && occupied.every((s) => s?.ready);
   const enoughPlayers = occupied.length >= 2;
   const you = yourSeat !== null ? room.seats[yourSeat] : null;
+
+  const [draggedSeat, setDraggedSeat] = useState<number | null>(null);
+
+  const is2v2 = room.rules.teamMode === "2v2" && room.maxPlayers === 4;
 
   async function toggleReady() {
     await fetch(`/api/rooms/${code}/ready`, {
@@ -339,14 +343,6 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId }),
-    });
-  }
-
-  async function restartMatch() {
-    await fetch(`/api/rooms/${code}/move`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "restart_match", clientId: getClientId() }),
     });
   }
 
@@ -369,41 +365,97 @@ function WaitingRoom({ room, yourSeat, clientId, code }: { room: Omit<Room, "pas
     });
   }
 
+  async function handleDrop(targetIdx: number) {
+    if (draggedSeat === null || draggedSeat === targetIdx) return;
+    await fetch(`/api/rooms/${code}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "swap_seats", clientId, from: draggedSeat, to: targetIdx }),
+    });
+    setDraggedSeat(null);
+  }
+
+  const renderSeat = (seat: typeof room.seats[0], i: number) => (
+    <div
+      key={i}
+      draggable
+      onDragStart={(e) => {
+        setDraggedSeat(i);
+        // Visual flair for the item being dragged
+        e.currentTarget.style.opacity = "0.5";
+      }}
+      onDragEnd={(e) => {
+        setDraggedSeat(null);
+        e.currentTarget.style.opacity = "1";
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        handleDrop(i);
+      }}
+      className={`rounded-xl border p-4 text-center cursor-grab active:cursor-grabbing transition-all ${
+        seat?.ready ? "border-neon-blue/50 bg-neon-blue/5" : "border-white/10 hover:border-white/30 hover:bg-white/5"
+      }`}
+    >
+      <div className="mb-1 text-[10px] uppercase tracking-wider text-white/40">
+        Seat {i + 1} {i === 0 && "(Host)"}
+      </div>
+      {seat ? (
+        <>
+          <div className="text-lg font-bold text-white pointer-events-none">{seat.nickname}</div>
+          <div className={`mt-2 inline-block rounded-full px-3 py-0.5 text-[10px] font-bold pointer-events-none ${seat.ready ? "bg-neon-blue/20 text-neon-blue-soft" : "bg-white/10 text-white/40"}`}>
+            {seat.ready ? "Ready" : "Not ready"}
+          </div>
+          {isHost && seat.clientId !== clientId && (
+            <button
+              onClick={() => kickPlayer(seat.clientId)}
+              className="mt-3 block w-full rounded-lg bg-neon-pink/20 py-1 text-[10px] font-bold text-neon-pink transition hover:bg-neon-pink/30"
+            >
+              Kick
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="py-2 text-white/30 text-sm pointer-events-none">Drag to swap here</div>
+      )}
+    </div>
+  );
+
   return (
     <div className="glass glow-purple rounded-2xl p-6">
-      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {room.seats.map((seat, i) => (
-          <div key={i} className={`rounded-xl border p-5 text-center ${seat?.ready ? "border-neon-blue/50 bg-neon-blue/5" : "border-white/10"}`}>
-            <div className="mb-1 text-xs uppercase tracking-wider text-white/40">
-              {i === 0 ? "Host" : `Seat ${i + 1}`}
+      
+      {is2v2 && <p className="text-center text-neon-blue-soft text-sm font-bold italic mb-4 animate-pulse">Drag and drop players to swap seats & teams!</p>}
+
+      {is2v2 ? (
+        // 2v2 Split Layout
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="glass rounded-xl p-4 bg-neon-blue/5 border border-neon-blue/20">
+            <h3 className="text-center font-black text-xl text-neon-blue-soft mb-4 uppercase tracking-widest">Team 1</h3>
+            <div className="flex flex-col gap-4">
+              {renderSeat(room.seats[0], 0)}
+              {renderSeat(room.seats[2], 2)}
             </div>
-            {seat ? (
-              <>
-                <div className="text-lg font-bold text-white">{seat.nickname}</div>
-                <div className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-bold ${seat.ready ? "bg-neon-blue/20 text-neon-blue-soft" : "bg-white/10 text-white/40"}`}>
-                  {seat.ready ? "Ready" : "Not ready"}
-                </div>
-                {isHost && seat.clientId !== clientId && (
-                  <button
-                    onClick={() => kickPlayer(seat.clientId)}
-                    className="mt-3 block w-full rounded-lg bg-neon-pink/20 py-1.5 text-xs font-bold text-neon-pink transition hover:bg-neon-pink/30"
-                  >
-                    Kick
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="py-2 text-white/30">Open seat</div>
-            )}
           </div>
-        ))}
-      </div>
+          <div className="glass rounded-xl p-4 bg-neon-pink/5 border border-neon-pink/20">
+            <h3 className="text-center font-black text-xl text-neon-pink mb-4 uppercase tracking-widest">Team 2</h3>
+            <div className="flex flex-col gap-4">
+              {renderSeat(room.seats[1], 1)}
+              {renderSeat(room.seats[3], 3)}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Standard Layout
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {room.seats.map((seat, i) => renderSeat(seat, i))}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2 text-xs text-white/50">
         <span className="glass rounded-full px-3 py-1 uppercase tracking-widest text-neon-purple-soft font-bold">{room.rules.gameMode || "Zhol"}</span>
+        {room.rules.teamMode === "2v2" && <span className="glass rounded-full px-3 py-1 uppercase font-bold text-emerald-400">2v2 Team Mode</span>}
         {room.rules.gameMode === "zhol" && <span className="glass rounded-full px-3 py-1">Out at {room.rules.eliminationScore} pts</span>}
         {room.rules.gameMode === "pishpirik" && <span className="glass rounded-full px-3 py-1">Ends when all 52 cards are used</span>}
-        {room.rules.gameMode === "cicmic" && <span className="glass rounded-full px-3 py-1">Classic rules — no points</span>}
       </div>
 
       <div className="flex flex-wrap gap-3">
