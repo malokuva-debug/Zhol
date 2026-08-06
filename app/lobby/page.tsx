@@ -46,7 +46,7 @@ export default function LobbyPage() {
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">Lobby</div>
-          <h1 className="text-3xl font-black text-glow-purple">ZHOL Tables</h1>
+          <h1 className="text-3xl font-black text-glow-purple">Tables</h1>
         </div>
         <div className="glass flex items-center gap-5 rounded-2xl px-5 py-3 text-sm">
           <span className="text-white/60">
