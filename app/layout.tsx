@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Zhol — Kosovo-style Gin Rummy",
-  description: "Play Zhol online with a friend. No account needed — pick a nickname and jump in.",
+  title: "Shuffle — Kosova",
+  description: "Play Zhol/Pishpirik/Cicmic online with a friend. No account needed — pick a nickname and jump in.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
