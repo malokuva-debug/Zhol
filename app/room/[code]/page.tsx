@@ -1228,7 +1228,7 @@ function GameBoard({
       </AnimatePresence>
 
       <div className="relative h-48 sm:h-56 z-20">
-        {displayGame.opponents.map((opp) => {
+        {game.opponents.map((opp) => {
           // Calculate strict relative position so teammates sit across from each other
           const relIdx = (opp.seatIdx - yourSeat + room.maxPlayers) % room.maxPlayers;
           const visualIndex = relIdx - 1;
@@ -1244,7 +1244,7 @@ function GameBoard({
                 cardCount={opp.cardCount} 
                 score={opp.score} 
                 eliminated={opp.eliminated} 
-                isTurn={displayGame.turnIdx === opp.seatIdx} 
+                isTurn={game.turnIdx === opp.seatIdx} 
                 faceDown={false} 
                 team={opp.team} 
               />
@@ -1256,13 +1256,19 @@ function GameBoard({
               )}
               
               {/* Show actual opponent cards! */}
-              {!opp.eliminated && !showingScore && opp.hand && (
-                <div className="flex justify-center -space-x-3 pt-2">
-                  {opp.hand.map((cardId, cIdx) => (
-                    <div key={cIdx} className="transform transition-transform hover:-translate-y-2 hover:z-30 shadow-md">
-                      <PlayingCard id={cardId} small />
+              {!opp.eliminated && (
+                <div className="flex justify-center mt-2">
+                  {opp.hand && opp.hand.length > 0 ? (
+                    <div className="flex justify-center -space-x-5 sm:-space-x-6 scale-[0.6] sm:scale-75 origin-top">
+                      {opp.hand.map((cardId, cIdx) => (
+                        <div key={cIdx} className="transform transition-transform hover:-translate-y-4 hover:z-30 shadow-xl">
+                          <PlayingCard id={cardId} />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <OpponentFan count={opp.cardCount} />
+                  )}
                 </div>
               )}
             </div>
