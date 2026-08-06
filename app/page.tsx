@@ -42,10 +42,10 @@ export default function HomePage() {
         className="glass glow-purple relative z-10 w-full max-w-md rounded-3xl p-8"
       >
         <div className="mb-2 text-center text-sm font-semibold uppercase tracking-[0.3em] text-neon-blue-soft">
-          Kosovo-Style
+          SHUFFLE
         </div>
         <h1 className="mb-1 text-center text-5xl font-black tracking-tight text-glow-purple">
-          ZHOL
+          KOSOVA
         </h1>
         <p className="mb-8 text-center text-sm text-white/60">
           Real-time 1v1 Gin Rummy. No sign-up, no passwords — just play.
