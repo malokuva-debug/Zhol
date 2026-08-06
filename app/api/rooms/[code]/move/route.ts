@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRoom, saveRoom } from "@/lib/store";
-import { applyDraw, applyDiscard, applyGin, startNextRound } from "@/lib/room-logic";
+import { applyDraw, applyDiscard, applyGin, startNextRound, addChatMessage } from "@/lib/room-logic";
 import { formsMill, hasNonMillPieces, hasLegalMoves, CICMIC_ADJACENCY, CICMIC_DESTROYED } from "@/lib/cicmic-engine";
 import { checkPishpirikCapture, scorePishpirikCards } from "@/lib/pishpirik-engine";
 import { publishRoomUpdate } from "@/lib/pusher";
@@ -57,18 +57,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
     return NextResponse.json({ ok: true });
   }
 
+  // FIX: Handled properly and defensively mapped for older rooms
   if (parsed.data.action === "chat") {
-    const seat = room.seats[seatIdx];
-    if (seat && parsed.data.text.trim().length > 0) {
-      room.chat.push({
-        id: Math.random().toString(36).substring(2, 9),
-        kind: "chat",
-        nickname: seat.nickname,
-        text: parsed.data.text.slice(0, 150).trim(),
-        at: Date.now()
-      });
-      if (room.chat.length > 50) room.chat.shift(); // Keep last 50 messages
-    }
+    if (!room.chat) room.chat = []; // Safe fallback for rooms generated before chat existed
+    
+    const result = addChatMessage(room, parsed.data.clientId, parsed.data.text);
+    if (result.error) return NextResponse.json({ error: result.error }, { status: 400 });
+
     await saveRoom(room);
     await publishRoomUpdate(room.code);
     return NextResponse.json({ ok: true });
