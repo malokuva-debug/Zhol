@@ -725,6 +725,7 @@ function PishpirikBoard({
   
   const [showSkull, setShowSkull] = useState(false);
   const [showGraveyard, setShowGraveyard] = useState(false);
+  const [showPishpirikAnim, setShowPishpirikAnim] = useState(false); // NEW STATE
 
   const myCaptured = game.capturedBySeat?.[yourSeat] || [];
   const myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
@@ -732,11 +733,21 @@ function PishpirikBoard({
   async function playCard(cardId: string) {
     setActionError("");
 
-    // Detect if we are playing a Jack on an empty table to show the Ghost Skull
     const { rank } = parseCardId(cardId);
+    
+    // Ghost Skull Animation
     if (rank === "J" && tablePile.length === 0) {
       setShowSkull(true);
       setTimeout(() => setShowSkull(false), 2000);
+    }
+
+    // NEW: Pishpirik Animation Detection
+    if (tablePile.length === 1) {
+      const topRank = parseCardId(tablePile[0]).rank;
+      if (rank === topRank || rank === "J") {
+         setShowPishpirikAnim(true);
+         setTimeout(() => setShowPishpirikAnim(false), 2500);
+      }
     }
 
     const res = await fetch(`/api/rooms/${code}/move`, {
@@ -767,6 +778,23 @@ function PishpirikBoard({
         )}
       </AnimatePresence>
 
+      {/* NEW: Pishpirik Text Animation */}
+      <AnimatePresence>
+        {showPishpirikAnim && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5, rotate: -10 }}
+            animate={{ opacity: 1, scale: 1.2, rotate: 0 }}
+            exit={{ opacity: 0, scale: 1.5, filter: "blur(10px)" }}
+            transition={{ type: "spring", stiffness: 200, damping: 10 }}
+            className="absolute inset-0 z-[160] flex items-center justify-center pointer-events-none"
+          >
+            <div className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-br from-neon-blue to-neon-pink italic drop-shadow-[0_0_40px_#ff5bc8]" style={{ WebkitTextStroke: "2px white" }}>
+              PISHPIRIK!
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       {/* 🪦 Graveyard Modal */}
       {showGraveyard && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowGraveyard(false)}>
@@ -851,12 +879,22 @@ function PishpirikBoard({
         </div>
         {actionError && <p className="mt-2 text-center text-sm text-neon-pink">{actionError}</p>}
 
-        {/* FIX: Add the missing Round End Component! */}
+        {/* FIX: Make the Next Round button work! */}
         <AnimatePresence>
           {game.turnPhase === "round_over" && game.lastRoundEnd && (
             <RoundEndReveal 
               gameState={game} 
-              onNextRound={() => {}} // Pishpirik currently ends the match completely
+              onNextRound={async () => {
+                try {
+                  await fetch(`/api/rooms/${code}/move`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "next_round", clientId: getClientId() }),
+                  });
+                } catch (err) {
+                  console.error("Failed to start next round", err);
+                }
+              }}
               onLeave={async () => {
                 removeRecentRoom(code);
                 await fetch(`/api/rooms/${code}/leave`, {
