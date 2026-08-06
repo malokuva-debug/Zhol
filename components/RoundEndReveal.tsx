@@ -8,9 +8,13 @@ import PlayingCard from "./PlayingCard";
 
 interface Props {
   gameState: ClientGameState;
+  isHost: boolean; // NEW PROP
   onNextRound: () => void;
+  onRestartMatch: () => void; // NEW PROP
   onLeave: () => void;
 }
+
+export default function RoundEndReveal({ gameState, isHost, onNextRound, onRestartMatch, onLeave }: Props) {
 
 // 🃏 Helper to visually render the actual deadwood cards
 function MiniCard({ cardId }: { cardId: string }) {
@@ -261,12 +265,22 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
                 Start Next Round
               </button>
             ) : (
-              <button 
-                onClick={onLeave}
-                className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(5,150,105,0.5)] cursor-pointer"
-              >
-                Match Finished - Return to Lobby
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+                {isHost && (
+                  <button 
+                    onClick={onRestartMatch}
+                    className="w-full py-3.5 bg-gradient-to-r from-neon-purple to-neon-pink hover:opacity-90 text-white font-bold text-lg rounded-xl transition shadow-[0_0_15px_rgba(255,91,200,0.4)] cursor-pointer"
+                  >
+                    Play Again
+                  </button>
+                )}
+                <button 
+                  onClick={onLeave}
+                  className={`w-full py-3.5 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white font-bold text-lg rounded-xl transition cursor-pointer`}
+                >
+                  Back to Lobby
+                </button>
+              </div>
             )}
           </motion.div>
         </motion.div>
