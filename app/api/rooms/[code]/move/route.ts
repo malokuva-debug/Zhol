@@ -141,32 +141,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
       if (captures) {
         const eaten = [...tablePile, cardId];
-        room.game.capturedBySeat[seatIdx] = [...(room.game.capturedBySeat[seatIdx] || []), ...eaten];
+        
+        // --------------------------------------------------------
+        // SHARED GRAVEYARD FIX:
+        // Unify graveyard: Team 1 captures go to seat 0, Team 2 captures go to seat 1.
+        // --------------------------------------------------------
+        const targetIdx = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
+
+        room.game.capturedBySeat[targetIdx] = [
+          ...(room.game.capturedBySeat[targetIdx] || []),
+          ...eaten
+        ];
         room.game.tablePile = [];
-        room.game.lastCaptureIdx = seatIdx;
+        room.game.lastCaptureIdx = targetIdx;
 
         if (isPishpirik) {
           const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
           
-          // NEW: In 2v2, check if ANY ENEMY TEAM member has a Pishpirik to cancel!
-          const enemyIdx = activeSeats.find((i) => {
-             const isEnemy = is2v2 ? room.seats[i]?.team !== myTeam : i !== seatIdx;
-             return isEnemy && (pishMap[i] || 0) > 0;
-          });
+          // Find the enemy's primary index for cancellation
+          let enemyTargetIdx: number | undefined;
+          
+          if (is2v2) {
+            enemyTargetIdx = myTeam === 1 ? 1 : 0;
+          } else {
+            enemyTargetIdx = activeSeats.find((i) => i !== seatIdx && (pishMap[i] || 0) > 0);
+          }
 
-          if (enemyIdx !== undefined) {
-             const enemyCurrent = pishMap[enemyIdx];
+          if (enemyTargetIdx !== undefined && (pishMap[enemyTargetIdx] || 0) > 0) {
+             const enemyCurrent = pishMap[enemyTargetIdx];
              if (enemyCurrent > pishPts) {
-                 pishMap[enemyIdx] -= pishPts;
+                 pishMap[enemyTargetIdx] -= pishPts;
              } else if (enemyCurrent < pishPts) {
-                 pishMap[enemyIdx] = 0;
-                 pishMap[seatIdx] = (pishMap[seatIdx] || 0) + (pishPts - enemyCurrent);
+                 pishMap[enemyTargetIdx] = 0;
+                 pishMap[targetIdx] = (pishMap[targetIdx] || 0) + (pishPts - enemyCurrent);
              } else {
-                 pishMap[enemyIdx] = 0;
+                 pishMap[enemyTargetIdx] = 0;
              }
           } else {
-            pishMap[seatIdx] = (pishMap[seatIdx] || 0) + pishPts;
+            pishMap[targetIdx] = (pishMap[targetIdx] || 0) + pishPts;
           }
         }
       } else {
