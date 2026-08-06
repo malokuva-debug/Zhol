@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { ClientGameState } from "@/lib/types";
 import { makeCard } from "@/lib/gin-engine";
+import PlayingCard from "./PlayingCard";
 
 interface Props {
   gameState: ClientGameState;
@@ -35,7 +36,87 @@ function MiniCard({ cardId }: { cardId: string }) {
   );
 }
 
-DeadwoodRow
+// 🧮 Individual row for counting a player's hand (Winner + Losers)
+function DeadwoodRow({ 
+  name, 
+  deadwood, 
+  deadCards, 
+  melds, 
+  eliminated, 
+  isWinner 
+}: { 
+  name: string; 
+  deadwood: number; 
+  deadCards: string[]; 
+  melds: any[]; 
+  eliminated: boolean; 
+  isWinner: boolean;
+}) {
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.15 } }
+  };
+  const item = {
+    hidden: { opacity: 0, scale: 0.5, x: 20 },
+    show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300, damping: 20 } }
+  };
+
+  return (
+    <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700"}`}>
+      <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
+        <span className="text-slate-200 font-bold text-lg">
+          {name} 
+          {eliminated && <span className="text-neon-pink text-[10px] uppercase font-black tracking-wider ml-2 bg-neon-pink/10 px-2 py-1 rounded">Eliminated</span>}
+        </span>
+        
+        {isWinner ? (
+           <span className="font-black text-emerald-400 text-lg uppercase tracking-wide">
+             Winner!
+           </span>
+        ) : (
+           <span className="font-black text-red-400 text-xl">
+             +{deadwood} pts
+           </span>
+        )}
+      </div>
+      
+      <div className="flex flex-col gap-3">
+        {/* Render Formed Melds / Runs for ALL players */}
+        {melds && melds.length > 0 && (
+          <div className="flex flex-wrap gap-4">
+            {melds.map((meld, mIdx) => (
+              <div key={mIdx} className="flex -space-x-4 bg-white/5 p-1.5 rounded-lg border border-white/10 shadow-inner">
+                {(meld.cards || meld).map((id: string, cIdx: number) => (
+                  <div key={cIdx} className="transform hover:-translate-y-1 transition-transform shadow-md">
+                    <MiniCard cardId={id} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Render Leftover Deadwood only for losers */}
+        {!isWinner && deadCards.length > 0 && (
+          <motion.div variants={container} initial="hidden" animate="show" className="flex flex-wrap gap-2 mt-1 p-2 bg-red-900/20 border border-red-900/40 rounded-lg">
+            <span className="w-full text-xs text-red-400 uppercase tracking-widest font-bold mb-1">Deadwood:</span>
+            {deadCards.map((id, i) => (
+              <motion.div key={`${id}-${i}`} variants={item}>
+                <MiniCard cardId={id} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+
+        {!isWinner && deadCards.length === 0 && (
+          <div className="mt-1 flex items-center text-slate-500 italic text-sm">
+            No deadwood
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Props) {
   // 'smash' plays the impact animation, 'counting' shows the deadwood tally
@@ -77,7 +158,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
             {ginLabel}
           </motion.div>
 
-         {/* Winner's Hand Display */}
+          {/* Winner's Hand Display */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -86,7 +167,6 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
           >
             <h3 className="text-white font-bold mb-3 text-center uppercase tracking-widest text-sm text-neon-blue-soft">Winner's Hand</h3>
             <div className="flex flex-wrap gap-4 justify-center">
-              {/* FIX: Set type to any to bypass strict checks, then map over meld.cards */}
               {gameState.lastRoundEnd.winnerMelds?.map((meld: any, mIdx: number) => (
                 <div key={mIdx} className="flex -space-x-4 bg-white/5 p-2 rounded-xl border border-white/10">
                   {(meld.cards || meld).map((cardId: string, cIdx: number) => (
@@ -124,7 +204,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
           initial={{ opacity: 0, y: 50, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl mx-4"
+          className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-2xl max-w-lg w-full text-center shadow-2xl mx-4 max-h-[90vh] overflow-y-auto"
         >
           <h2 className="text-3xl font-black text-[#a35bff] mb-1 italic">{ginLabel}</h2>
           <p className="text-slate-300 mb-6 font-medium">
@@ -144,7 +224,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
                   name={name}
                   deadwood={p.deadwood}
                   deadCards={p.deadCards || []}
-                  melds={p.melds || []} // FIX: Pass the melds to the row
+                  melds={p.melds || []}
                   eliminated={p.eliminated}
                   isWinner={isWinner}
                 />
@@ -154,7 +234,7 @@ export default function RoundEndReveal({ gameState, onNextRound, onLeave }: Prop
 
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }} // FIX: Make button instantly visible and clickable
+            animate={{ opacity: 1 }}
             className="w-full"
           >
             {!gameState.matchOver ? (
