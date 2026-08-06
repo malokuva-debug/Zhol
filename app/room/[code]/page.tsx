@@ -1447,11 +1447,3 @@ function WinOverlay({ game, room, onExit }: { game: ClientGameState; room: Omit<
     </motion.div>
   );
 }
-
-function seatPosition(visualIndex: number, totalOpponentSeats: number): { x: number; y: number } {
-  const totalSeats = totalOpponentSeats + 1;
-  const angleStep = 360 / totalSeats;
-  const angleDeg = 90 + angleStep * (visualIndex + 1);
-  const rad = (angleDeg * Math.PI) / 180;
-  return { x: 50 + 42 * Math.cos(rad), y: 50 + 40 * Math.sin(rad) };
-}
