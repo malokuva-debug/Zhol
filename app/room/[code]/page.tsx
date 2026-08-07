@@ -1015,18 +1015,30 @@ function PishpirikBoard({
           {tablePile.length === 0 ? (
             <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem] flex items-center justify-center text-white/30 text-xs">Empty</div>
           ) : (
-            <div className="relative h-24 w-16 sm:h-28 sm:w-[4.5rem]">
-              {tablePile.map((id, i) => (
-                <motion.div
-                  key={id + i}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1, x: i * 3, y: -i * 3, rotate: i % 2 === 0 ? -2 : 2 }}
-                  className="absolute inset-0"
-                  style={{ zIndex: i }}
-                >
-                  <PlayingCard id={id} />
-                </motion.div>
-              ))}
+            <div className="relative h-24 w-16 sm:h-28 sm:w-[4.5rem] flex justify-center">
+              {tablePile.map((id, i) => {
+                // If it's the start of the game, spread the 4 cards wide so everyone can see them!
+                const totalCaptured = game.capturedBySeat ? Object.values(game.capturedBySeat).reduce((sum, arr) => sum + arr.length, 0) : 0;
+                const isStartSpread = tablePile.length === 4 && totalCaptured === 0;
+
+                return (
+                  <motion.div
+                    key={id + i}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ 
+                      opacity: 1, 
+                      scale: 1, 
+                      x: isStartSpread ? (i - 1.5) * 55 : i * 3, // Wide horizontal spread at start!
+                      y: isStartSpread ? 0 : -i * 3, 
+                      rotate: isStartSpread ? (i - 1.5) * 5 : (i % 2 === 0 ? -2 : 2) 
+                    }}
+                    className="absolute inset-0"
+                    style={{ zIndex: i }}
+                  >
+                    <PlayingCard id={id} />
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
