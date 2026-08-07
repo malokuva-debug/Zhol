@@ -812,9 +812,15 @@ function PishpirikBoard({
   let myCaptured: string[] = [];
   let myPishPts = 0;
   let myPishCards: string[] = [];
+
   if (is2v2) {
-    myPishCards = game.pishpirikCardsBySeat?.[myTeam === 1 ? 0 : 1] || [];
+    const teamKey = myTeam === 1 ? 0 : 1;
+    myCaptured = game.capturedBySeat?.[teamKey] || [];
+    myPishPts = game.pishpiriksBySeat?.[teamKey] || 0;
+    myPishCards = game.pishpirikCardsBySeat?.[teamKey] || [];
   } else {
+    myCaptured = game.capturedBySeat?.[yourSeat] || [];
+    myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
     myPishCards = game.pishpirikCardsBySeat?.[yourSeat] || [];
   }
 
@@ -826,16 +832,6 @@ function PishpirikBoard({
       return () => clearTimeout(timer);
     }
   }, [game.recentPishpirik?.at]);
-
-  if (is2v2) {
-    // Shared Graveyard: Team 1 reads key 0, Team 2 reads key 1
-    const teamKey = myTeam === 1 ? 0 : 1;
-    myCaptured = game.capturedBySeat?.[teamKey] || [];
-    myPishPts = game.pishpiriksBySeat?.[teamKey] || 0;
-  } else {
-    myCaptured = game.capturedBySeat?.[yourSeat] || [];
-    myPishPts = game.pishpiriksBySeat?.[yourSeat] || 0;
-  }
 
   const clientId = getClientId();
   const isHost = room.hostClientId === clientId;
@@ -857,7 +853,7 @@ function PishpirikBoard({
     });
   }
 
- async function playCard(cardId: string) {
+  async function playCard(cardId: string) {
     setActionError("");
 
     const { rank } = parseCardId(cardId);
@@ -1014,8 +1010,6 @@ function PishpirikBoard({
              </button>
            )}
         </div>
-
-        <div className="flex items-center justify-center py-16">
 
         <div className="flex items-center justify-center py-16">
           {tablePile.length === 0 ? (
