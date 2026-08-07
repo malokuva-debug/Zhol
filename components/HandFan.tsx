@@ -65,41 +65,23 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ 3D BACK FINGERS (BEHIND THE CARDS) */}
-      <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 -z-10 pointer-events-none drop-shadow-[0_15px_15px_rgba(0,0,0,0.8)]">
-        <svg width="400" height="200" viewBox="0 0 400 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="fingerGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#b3763c"/>
-              <stop offset="40%" stopColor="#e2ad76"/>
-              <stop offset="85%" stopColor="#d49a59"/>
-              <stop offset="100%" stopColor="#965a25"/>
-            </linearGradient>
-            <linearGradient id="creaseGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#8a4f1c"/>
-              <stop offset="100%" stopColor="#e2ad76" stopOpacity="0"/>
-            </linearGradient>
-          </defs>
-
-          {/* Pinky */}
-          <path d="M 70 200 C 50 120, 80 80, 100 80 C 120 80, 120 120, 110 200" fill="url(#fingerGrad)"/>
-          <path d="M 80 110 Q 100 120 115 110" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          <path d="M 75 140 Q 100 150 112 140" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          
-          {/* Ring Finger */}
-          <path d="M 125 200 C 115 80, 150 40, 175 40 C 200 40, 205 80, 185 200" fill="url(#fingerGrad)"/>
-          <path d="M 140 80 Q 165 95 185 80" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          <path d="M 135 120 Q 165 135 180 120" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-
-          {/* Middle Finger */}
-          <path d="M 200 200 C 195 60, 230 20, 260 20 C 290 20, 290 60, 270 200" fill="url(#fingerGrad)"/>
-          <path d="M 215 70 Q 245 85 270 70" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          <path d="M 210 110 Q 245 125 265 110" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-
-          {/* Index Finger */}
-          <path d="M 285 200 C 290 80, 330 40, 360 40 C 390 40, 370 80, 345 200" fill="url(#fingerGrad)"/>
-          <path d="M 310 80 Q 335 95 365 80" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
-          <path d="M 305 120 Q 335 135 355 120" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+      {/* 🖐️ BACK LAYER: Folded fingers on the right side of the deck */}
+      <div className="absolute -bottom-16 left-1/2 -translate-x-[45%] -z-10 pointer-events-none drop-shadow-md">
+        <svg width="240" height="340" viewBox="0 0 240 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#F4CA9E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="#FCE1C6">
+            {/* Index Finger */}
+            <path d="M 120 130 C 180 120, 190 170, 140 180" />
+            {/* Middle Finger */}
+            <path d="M 125 165 C 195 155, 205 205, 145 215" />
+            {/* Ring Finger */}
+            <path d="M 130 200 C 200 190, 210 240, 145 250" />
+            {/* Pinky Finger */}
+            <path d="M 130 235 C 190 225, 200 275, 140 285" />
+            
+            {/* Right Wrist Base Connection */}
+            <path d="M 135 270 C 150 280, 150 310, 140 340 L 100 340 Z" stroke="none" />
+            <path d="M 135 270 C 150 280, 150 310, 140 340" fill="none" />
+          </g>
         </svg>
       </div>
 
@@ -154,44 +136,24 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ 3D THUMB (IN FRONT OF THE CARDS) */}
-      {/* z-[250] ensures it stays in front even while dragging a card (z-200) */}
-      <div className="absolute -bottom-8 left-1/2 -translate-x-[40%] z-[250] pointer-events-none drop-shadow-[0_15px_25px_rgba(0,0,0,0.7)]">
-        <svg width="220" height="180" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="thumbTip" cx="40%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#f5c796"/>
-              <stop offset="70%" stopColor="#d49455"/>
-              <stop offset="100%" stopColor="#a36324"/>
-            </radialGradient>
-            <linearGradient id="palmGrad" x1="0" y1="1" x2="1" y2="0">
-              <stop offset="0%" stopColor="#b3763c"/>
-              <stop offset="100%" stopColor="#e2ad76"/>
-            </linearGradient>
-            <linearGradient id="nailGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#ffeadd"/>
-              <stop offset="100%" stopColor="#e6ab91"/>
-            </linearGradient>
-            <filter id="thumbShadow">
-              <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000" floodOpacity="0.4"/>
-            </filter>
-          </defs>
+      {/* ✋ FRONT LAYER: Thumb, Palm, and Left Wrist */}
+      <div className="absolute -bottom-16 left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl">
+        <svg width="240" height="340" viewBox="0 0 240 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Main Hand Base Outline & Fill */}
+          <path d="M 70 340 L 65 220 C 50 160, 50 130, 75 100 C 85 80, 90 40, 110 35 C 130 30, 135 55, 120 85 C 115 100, 115 130, 115 150 L 135 200 L 130 340 Z" fill="#FCE1C6" />
+          <path d="M 70 340 L 65 220 C 50 160, 50 130, 75 100 C 85 80, 90 40, 110 35 C 130 30, 135 55, 120 85 C 115 100, 115 130, 115 150 L 135 200 L 130 340" stroke="#F4CA9E" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
           
-          {/* Base Palm */}
-          <path d="M -20 180 C 20 80, 80 70, 110 70 C 150 70, 160 120, 180 180 Z" fill="url(#palmGrad)"/>
+          {/* Palm Life Line Crease */}
+          <path d="M 115 150 C 95 190, 90 240, 100 290" stroke="#F4CA9E" strokeWidth="3" strokeLinecap="round" fill="none"/>
           
-          {/* Thumb curling over with built-in SVG drop shadow */}
-          <path d="M 160 180 C 170 120, 160 80, 140 40 C 120 0, 80 10, 70 40 C 60 70, 80 110, 110 180 Z" fill="url(#thumbTip)" filter="url(#thumbShadow)"/>
+          {/* Thumb Knuckle Crease */}
+          <path d="M 90 95 Q 115 85 125 110" stroke="#F4CA9E" strokeWidth="3" strokeLinecap="round" fill="none"/>
           
-          {/* Deep Knuckle Creases */}
-          <path d="M 90 90 Q 110 80 130 95" stroke="#965a25" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          <path d="M 85 105 Q 110 95 125 110" stroke="#965a25" strokeWidth="2" fill="none" strokeLinecap="round"/>
+          {/* Flat Stylized Nail */}
+          <path d="M 110 38 C 105 32, 115 28, 122 30 C 130 32, 130 45, 120 45 Z" fill="#FFFFFF" stroke="#F4CA9E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           
-          {/* Glossy Thumbnail */}
-          <path d="M 80 40 C 75 25, 85 10, 100 15 C 115 20, 115 35, 110 45 C 100 50, 85 50, 80 40 Z" fill="url(#nailGrad)"/>
-          
-          {/* Specular White Highlight on the Nail */}
-          <path d="M 85 30 C 85 20, 95 15, 100 18" stroke="#ffffff" strokeWidth="2.5" strokeOpacity="0.75" fill="none" strokeLinecap="round"/>
+          {/* Lower Thumb Joint Crease */}
+          <path d="M 95 130 Q 115 125 125 140" stroke="#F4CA9E" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
         </svg>
       </div>
 
