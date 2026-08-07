@@ -853,7 +853,8 @@ function PishpirikBoard({
 
     if (tablePile.length === 1) {
       const topRank = parseCardId(tablePile[0]).rank;
-      if (rank === topRank || rank === "J") {
+      // STRICT CHECK: J on non-J is no longer a Pishpirik
+      if (rank === topRank) {
          setShowPishpirikAnim(true);
          setTimeout(() => setShowPishpirikAnim(false), 2500);
       }
@@ -986,14 +987,24 @@ function PishpirikBoard({
         {/* Captured Cards Button */}
         <div className="absolute left-4 top-4 z-10">
            {myCaptured.length > 0 && (
-             <button onClick={() => setShowGraveyard(true)} className="flex flex-col items-center group">
-               <div className="relative h-16 w-11 rounded border border-white/20 shadow-md transition-transform group-hover:-translate-y-1">
+             <button onClick={() => setShowGraveyard(true)} className="flex flex-col items-center group relative">
+               
+               {/* FACE UP PISHPIRIK INDICATOR: Sideways card sticking out under the deck */}
+               {myPishPts > 0 && (
+                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90 z-0 shadow-lg">
+                   <div className="h-16 w-11 bg-gradient-to-br from-white to-slate-200 rounded border border-slate-300 flex items-center justify-center">
+                     <span className="text-neon-pink font-black text-[10px] rotate-[-90deg] uppercase tracking-tighter">Pish!</span>
+                   </div>
+                 </div>
+               )}
+
+               <div className="relative h-16 w-11 rounded border border-white/20 shadow-md transition-transform group-hover:-translate-y-1 z-10">
                  <PlayingCard id={null} faceDown small />
                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded backdrop-blur-[1px]">
                    <span className="text-white font-black text-sm">+{myCaptured.length}</span>
                  </div>
                </div>
-               <span className="text-[10px] uppercase font-bold text-white/50 mt-1">View</span>
+               <span className="text-[10px] uppercase font-bold text-white/50 mt-1 relative z-20">View</span>
              </button>
            )}
         </div>
