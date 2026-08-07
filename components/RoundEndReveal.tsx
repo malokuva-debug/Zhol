@@ -149,16 +149,47 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
     type === "joker_gin" ? "JOKER ZHOL!" : 
     "ZHOL!";
 
+ // -------------------------------------------------------------
+  // ROW AGGREGATION LOGIC (INDIVIDUAL VS TEAMS)
   // -------------------------------------------------------------
-  // TEAM DISPLAY LOGIC
-  // -------------------------------------------------------------
-  const team1Players = room.seats.filter(s => s?.team === 1).map(s => s!.nickname);
-  const team2Players = room.seats.filter(s => s?.team === 2).map(s => s!.nickname);
-  const team1Score = room.seats.find(s => s?.team === 1)?.score || 0;
-  const team2Score = room.seats.find(s => s?.team === 2)?.score || 0;
-
   let displayRows: any[] = [];
-  if (!is2v2) {
+
+  if (is2v2) {
+    // Grab one representative from each team (Backend already merged their points and cards!)
+    const t1 = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 1);
+    const t2 = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 2);
+
+    const getNames = (team: 1 | 2) => {
+      return room.seats.filter(s => s?.team === team).map(s => s!.nickname).join(" & ");
+    };
+
+    if (t1) {
+      displayRows.push({
+        key: "team-1",
+        name: `${getNames(1)} Team`,
+        deadwood: t1.deadwood, // Full team score
+        deadCards: t1.deadCards || [], // ALL captured team cards
+        melds: [],
+        eliminated: false,
+        isWinner: t1.deadwood >= (t2?.deadwood || 0),
+        team: 1
+      });
+    }
+
+    if (t2) {
+      displayRows.push({
+        key: "team-2",
+        name: `${getNames(2)} Team`,
+        deadwood: t2.deadwood, // Full team score
+        deadCards: t2.deadCards || [], // ALL captured team cards
+        melds: [],
+        eliminated: false,
+        isWinner: t2.deadwood >= (t1?.deadwood || 0),
+        team: 2
+      });
+    }
+  } else {
+    // Normal Free-For-All
     displayRows = pointsBySeat.map((p) => {
       const opp = gameState.opponents.find(o => o.seatIdx === p.seatIdx);
       const isMe = p.seatIdx === gameState.yourSeat;
