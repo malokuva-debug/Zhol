@@ -107,6 +107,12 @@ export interface GameState {
   matchWinnerIdx?: number;
 
   // --- PISHPIRIK STATE ---
+  recentCapture?: {
+    playedCard: string;
+    capturedCards: string[];
+    capturerIdx: number;
+    at: number;
+  };
   dealerIdx?: number;
   tablePile?: CardId[];
   capturedBySeat?: Record<number, CardId[]>;
