@@ -134,7 +134,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const tablePile = room.game.tablePile || [];
       const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       
-      const { captures, isPishpirik, isJackPishpirik } = checkPishpirikCapture(cardId, tablePile);
+      const { captures } = checkPishpirikCapture(cardId, tablePile);
+
+      // STRICT PISHPIRIK RULES: Must be exactly 1 card, and ranks MUST match exactly.
+      // Wildcard Jacks sweeping a non-Jack do NOT count as a Pishpirik!
+      let isPishpirik = false;
+      let isJackPishpirik = false;
+      
+      if (captures && tablePile.length === 1) {
+        const playedRank = cardId.split("_")[0].slice(0, -1);
+        const tableRank = tablePile[0].split("_")[0].slice(0, -1);
+        
+        if (playedRank === tableRank) {
+          isPishpirik = true;
+          if (playedRank === "J") isJackPishpirik = true;
+        }
+      }
 
       const is2v2 = room.rules.gameMode === "pishpirik" && room.maxPlayers === 4;
       const myTeam = room.seats[seatIdx]?.team ?? (seatIdx % 2 === 0 ? 1 : 2);
@@ -142,7 +157,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
 
-      // Shared Team Graveyard Key: Team 1 uses key 0, Team 2 uses key 1
       const teamGraveyardKey = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
 
       if (captures) {
@@ -155,6 +169,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         room.game.lastCaptureIdx = seatIdx;
 
         if (isPishpirik) {
+          // 20 Points for Jack-on-Jack, 10 for normal
           const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
           const enemyKey = is2v2 ? (myTeam === 1 ? 1 : 0) : activeSeats.find(i => i !== seatIdx && (pishMap[i] || 0) > 0);
@@ -185,7 +200,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.seats[i]!.hand = room.game.deck.splice(0, 4);
           }
         } else {
-          // Sweep remaining table pile to team that made the last capture
+          // 1. SWEEP THE TABLE: Remaining cards go to the last person/team to capture
           if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
             const lastTeam = room.seats[room.game.lastCaptureIdx]?.team ?? (room.game.lastCaptureIdx % 2 === 0 ? 1 : 2);
             const sweepKey = is2v2 ? (lastTeam === 1 ? 0 : 1) : room.game.lastCaptureIdx;
@@ -201,8 +216,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             const team1Captured = room.game.capturedBySeat[0] || [];
             const team2Captured = room.game.capturedBySeat[1] || [];
 
-            const team1Pts = scorePishpirikCards(team1Captured) + (room.game.pishpiriksBySeat[0] || 0);
-            const team2Pts = scorePishpirikCards(team2Captured) + (room.game.pishpiriksBySeat[1] || 0);
+            let team1Pts = scorePishpirikCards(team1Captured) + (room.game.pishpiriksBySeat[0] || 0);
+            let team2Pts = scorePishpirikCards(team2Captured) + (room.game.pishpiriksBySeat[1] || 0);
+
+            // 2. MOST CARDS BONUS: +3 Points for the team that took the most cards
+            if (team1Captured.length > team2Captured.length) {
+              team1Pts += 3;
+            } else if (team2Captured.length > team1Captured.length) {
+              team2Pts += 3;
+            }
 
             // Add team points to both members of each team
             room.seats.forEach((s, idx) => {
