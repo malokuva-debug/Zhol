@@ -167,6 +167,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       const teamGraveyardKey = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
 
       if (captures) {
+        // Save the capture animation snapshot before the table pile is cleared!
+        room.game.recentCapture = {
+          playedCard: cardId,
+          capturedCards: [...tablePile],
+          capturerIdx: seatIdx,
+          at: Date.now()
+        };
+
         const eaten = [...tablePile, cardId];
         room.game.capturedBySeat[teamGraveyardKey] = [
           ...(room.game.capturedBySeat[teamGraveyardKey] || []),
