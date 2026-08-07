@@ -806,6 +806,20 @@ function PishpirikBoard({
   const [showGraveyard, setShowGraveyard] = useState(false);
   const [showPishpirikAnim, setShowPishpirikAnim] = useState(false);
 
+  const [captureAnim, setCaptureAnim] = useState<any>(null);
+
+  // GLOBAL SWEEP CAPTURE ANIMATION
+  useEffect(() => {
+    if (game.recentCapture && game.recentCapture.at > Date.now() - 2500) {
+      setCaptureAnim(game.recentCapture);
+      // Wait 1.5s for the animation to play, then clear it to show the real empty table
+      const timer = setTimeout(() => setCaptureAnim(null), 1500);
+      return () => clearTimeout(timer);
+    } else {
+      setCaptureAnim(null);
+    }
+  }, [game.recentCapture?.at]);
+
   const is2v2 = room.rules.gameMode === "pishpirik" && room.maxPlayers === 4;
   const myTeam = room.seats[yourSeat]?.team ?? (yourSeat % 2 === 0 ? 1 : 2);
 
@@ -1028,13 +1042,16 @@ function PishpirikBoard({
            )}
         </div>
 
-        <div className="flex items-center justify-center py-16">
-          {tablePile.length === 0 ? (
+        <div className="flex items-center justify-center py-16 relative">
+          
+          {/* 1. Normal Table (Hides when animation is playing) */}
+          {!captureAnim && tablePile.length === 0 && (
             <div className="h-24 w-16 rounded-lg border border-dashed border-white/15 bg-black/10 sm:h-28 sm:w-[4.5rem] flex items-center justify-center text-white/30 text-xs">Empty</div>
-          ) : (
+          )}
+          
+          {!captureAnim && tablePile.length > 0 && (
             <div className="relative h-24 w-16 sm:h-28 sm:w-[4.5rem] flex justify-center">
               {tablePile.map((id, i) => {
-                // If it's the start of the game, spread the 4 cards wide so everyone can see them!
                 const totalCaptured = game.capturedBySeat ? Object.values(game.capturedBySeat).reduce((sum, arr) => sum + arr.length, 0) : 0;
                 const isStartSpread = tablePile.length === 4 && totalCaptured === 0;
 
@@ -1043,9 +1060,8 @@ function PishpirikBoard({
                     key={id + i}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ 
-                      opacity: 1, 
-                      scale: 1, 
-                      x: isStartSpread ? (i - 1.5) * 55 : i * 3, // Wide horizontal spread at start!
+                      opacity: 1, scale: 1, 
+                      x: isStartSpread ? (i - 1.5) * 55 : i * 3,
                       y: isStartSpread ? 0 : -i * 3, 
                       rotate: isStartSpread ? (i - 1.5) * 5 : (i % 2 === 0 ? -2 : 2) 
                     }}
@@ -1058,6 +1074,44 @@ function PishpirikBoard({
               })}
             </div>
           )}
+
+          {/* 2. 🎬 The Sweep Animation Overlay! */}
+          {captureAnim && (
+            <motion.div
+              initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+              animate={{ 
+                // Swoop towards local graveyard (bottom-left) if it's us or our teammate! Else swoop away to enemy.
+                x: captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? -150 : 0, 
+                y: captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? 200 : -250, 
+                scale: 0.3, 
+                opacity: 0 
+              }}
+              // Waits 0.8 seconds before sweeping it away so you can see it slide under!
+              transition={{ delay: 0.8, duration: 0.5, ease: "easeIn" }}
+              className="absolute h-24 w-16 sm:h-28 sm:w-[4.5rem] z-50 flex justify-center items-center"
+            >
+              
+              {/* The Pile that was already on the table */}
+              {captureAnim.capturedCards.map((id: string, i: number) => (
+                <div key={"cap-" + id} className="absolute inset-0 drop-shadow-xl" style={{ zIndex: i + 1, transform: `translate(${i * 3}px, ${-i * 3}px) rotate(${i % 2 === 0 ? -2 : 2}deg)` }}>
+                  <PlayingCard id={id} />
+                </div>
+              ))}
+              
+              {/* The played card sliding elegantly UNDER the pile */}
+              <motion.div
+                initial={{ y: 80, scale: 1.1, opacity: 0 }}
+                animate={{ y: 0, scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="absolute inset-0 drop-shadow-lg"
+                style={{ zIndex: 0 }} // Z-INDEX 0 PUTS IT UNDER!
+              >
+                <PlayingCard id={captureAnim.playedCard} />
+              </motion.div>
+              
+            </motion.div>
+          )}
+
         </div>
         
         <div className="text-center text-sm font-semibold mt-6">
