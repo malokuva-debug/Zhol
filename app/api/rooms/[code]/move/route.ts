@@ -313,57 +313,78 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       break;
     }
 
-    case "cicmic_place": { /* omitted for brevity, keeping original logic below */
+    case "cicmic_place": {
       const board = room.game.board || {};
       const pt = parsed.data.point;
       const playerNum = seatIdx === 0 ? 1 : 2;
       const unplaced = room.game.unplacedPieces || { 1: 9, 2: 9 };
-      if (board[pt] !== null && board[pt] !== undefined) { result = { error: board[pt] === CICMIC_DESTROYED ? "Destroyed by Mill" : "Occupied" }; break; }
+      
+      // REMOVED DESTROYED CHECK: Now it just checks if the spot is occupied
+      if (board[pt] !== null && board[pt] !== undefined) { 
+        result = { error: "Occupied" }; 
+        break; 
+      }
+      
       if ((unplaced[playerNum as 1 | 2] ?? 0) <= 0) { result = { error: "No pieces left." }; break; }
       board[pt] = playerNum as 1 | 2;
       unplaced[playerNum as 1 | 2] = (unplaced[playerNum as 1 | 2] ?? 0) - 1;
       room.game.unplacedPieces = unplaced;
+      
       if (formsMill(board, pt, playerNum as 1 | 2)) room.game.pendingRemoval = true;
       else room.game.turnIdx = room.seats.findIndex((_, i) => i !== seatIdx);
+      
       room.game.board = board;
       room.game.turnStartedAt = Date.now();
       result = { ok: true };
       break;
     }
+    
     case "cicmic_move": {
       const board = room.game.board || {};
       const { from, to } = parsed.data;
       const playerNum = seatIdx === 0 ? 1 : 2;
       const enemyNum = playerNum === 1 ? 2 : 1;
+      
       if (board[from] !== playerNum || board[to] !== null) { result = { error: "Invalid move." }; break; }
       const isFlying = Object.values(board).filter((v) => v === playerNum).length === 3;
       if (!CICMIC_ADJACENCY[from]?.includes(to) && !isFlying) { result = { error: "Must slide to adjacent." }; break; }
+      
       board[from] = null;
       board[to] = playerNum as 1 | 2;
+      
       if (formsMill(board, to, playerNum as 1 | 2)) room.game.pendingRemoval = true;
       else {
         if (!hasLegalMoves(board, enemyNum as 1 | 2, Object.values(board).filter((v) => v === enemyNum).length === 3)) {
           room.game.matchOver = true; room.game.matchWinnerIdx = seatIdx;
         } else room.game.turnIdx = room.seats.findIndex((_, i) => i !== seatIdx);
       }
+      
       room.game.board = board;
       room.game.turnStartedAt = Date.now();
       result = { ok: true };
       break;
     }
+    
     case "cicmic_remove": {
       const board = room.game.board || {};
       if (!room.game.pendingRemoval) { result = { error: "No active removal." }; break; }
+      
       const pt = parsed.data.point;
       const enemyNum = seatIdx === 0 ? 2 : 1;
+      
       if (board[pt] !== enemyNum) { result = { error: "Target is not enemy." }; break; }
       if (formsMill(board, pt, enemyNum as 1 | 2) && hasNonMillPieces(board, enemyNum as 1 | 2)) { result = { error: "Cannot destroy Mill." }; break; }
-      board[pt] = CICMIC_DESTROYED;
+      
+      // FIXED: Set the space back to null instead of destroying it permanently
+      board[pt] = null;
+      
       room.game.pendingRemoval = false;
       const unplaced = room.game.unplacedPieces || { 1: 9, 2: 9 };
+      
       if (Object.values(board).filter((v) => v === enemyNum).length < 3 && (unplaced[1] ?? 0) === 0 && (unplaced[2] ?? 0) === 0) {
         room.game.matchOver = true; room.game.matchWinnerIdx = seatIdx;
       } else room.game.turnIdx = room.seats.findIndex((_, i) => i !== seatIdx);
+      
       room.game.board = board;
       room.game.turnStartedAt = Date.now();
       result = { ok: true };
