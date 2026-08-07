@@ -107,11 +107,15 @@ function DeadwoodRow({
         {showCards && (
           <motion.div variants={container} initial="hidden" animate="show" className={`flex flex-wrap gap-2 mt-1 p-2 border rounded-lg ${isPishpirikGame ? 'bg-blue-900/20 border-blue-900/40' : 'bg-red-900/20 border-red-900/40'}`}>
             <span className={`w-full text-xs uppercase tracking-widest font-bold mb-1 ${isPishpirikGame ? 'text-blue-400' : 'text-red-400'}`}>{cardsLabel}</span>
-            {deadCards.map((id, i) => (
-              <motion.div key={`${id}-${i}`} variants={item}>
-                <MiniCard cardId={id} />
-              </motion.div>
-            ))}
+            {deadCards.map((id: string, i: number) => {
+              const isPishCard = pishpirikCards?.includes(id);
+              return (
+                <motion.div key={`${id}-${i}`} variants={item} className={`relative ${isPishCard ? 'ring-2 ring-neon-pink rounded-lg shadow-[0_0_10px_#ff5bc8]' : ''}`}>
+                  <MiniCard cardId={id} />
+                  {isPishCard && <div className="absolute -top-2 -right-2 bg-neon-pink text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-black shadow-lg">P!</div>}
+                </motion.div>
+              );
+            })}
           </motion.div>
         )}
 
@@ -143,7 +147,7 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
   const is2v2 = room.rules.teamMode === "2v2";
   
   const ginLabel = 
-    isPishpirikGame ? "PISHPIRIK!" : 
+    isPishpirikGame ? "ROUND ENDED" : 
     type === "suit_joker_gin" ? "SUIT & JOKER ZHOL!" : 
     type === "suit_gin" ? "SUIT ZHOL!" : 
     type === "joker_gin" ? "JOKER ZHOL!" : 
@@ -168,7 +172,8 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
         key: "team-1",
         name: `${getNames(1)} Team`,
         deadwood: t1.deadwood, // Full team score
-        deadCards: t1.deadCards || [], // ALL captured team cards
+        deadCards: t1.deadCards || [],
+        pishpirikCards: t1.pishpirikCards || [],
         melds: [],
         eliminated: false,
         isWinner: t1.deadwood >= (t2?.deadwood || 0),
