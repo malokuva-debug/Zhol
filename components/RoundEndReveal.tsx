@@ -162,8 +162,8 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
 
   if (is2v2) {
     // Grab one representative from each team (Backend already merged their points and cards!)
-    const t1 = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 1);
-    const t2 = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 2);
+    const t1: any = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 1);
+    const t2: any = pointsBySeat.find(p => room.seats[p.seatIdx]?.team === 2);
 
     const getNames = (team: 1 | 2) => {
       return room.seats.filter(s => s?.team === team).map(s => s!.nickname).join(" & ");
