@@ -65,11 +65,11 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ BACK LAYER: Only renders when there are cards in hand */}
+      {/* 🖐️ BACK LAYER: Moved higher, shifted right (-38%), clipped to avoid overflow */}
       {n > 0 && (
         <div 
-          className="absolute bottom-[-241px] left-1/2 -translate-x-[45%] z-[0] pointer-events-none drop-shadow-md w-32 h-auto"
-          style={{ clipPath: "inset(-500px -100px 241px -100px)" }}
+          className="absolute bottom-[-110px] left-1/2 -translate-x-[38%] z-[0] pointer-events-none drop-shadow-md w-36 h-auto"
+          style={{ clipPath: "inset(-500px -100px 110px -100px)" }}
         >
           <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <g id="Hand-Back">
@@ -144,11 +144,11 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ FRONT LAYER: Only renders when there are cards in hand */}
+      {/* ✋ FRONT LAYER: Moved higher, shifted right (-38%), clipped to avoid overflow */}
       {n > 0 && (
         <div 
-          className="absolute bottom-[-254px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-32 h-auto"
-          style={{ clipPath: "inset(-500px -100px 254px -100px)" }}
+          className="absolute bottom-[-122px] left-1/2 -translate-x-[38%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto"
+          style={{ clipPath: "inset(-500px -100px 122px -100px)" }}
         >
           <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <g id="Thumb">
