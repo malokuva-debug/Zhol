@@ -65,32 +65,45 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ THE 4 FINGERS BEHIND THE CARDS */}
-      {/* -z-10 pushes this layer entirely behind the Reorder.Group (the cards) */}
-      <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 -z-10 pointer-events-none drop-shadow-[0_15px_15px_rgba(0,0,0,0.8)]">
-        <svg width="380" height="220" viewBox="0 0 400 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Pinky Finger (Far Left) - slightly shorter */}
-          <path d="M 50 220 C 10 130, 90 100, 110 220" fill="#d49a59" />
-          {/* Pinky Pad Crease */}
-          <path d="M 60 145 Q 80 130 90 160" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+      {/* 🖐️ 3D BACK FINGERS (BEHIND THE CARDS) */}
+      <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 -z-10 pointer-events-none drop-shadow-[0_15px_15px_rgba(0,0,0,0.8)]">
+        <svg width="400" height="200" viewBox="0 0 400 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="fingerGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#b3763c"/>
+              <stop offset="40%" stopColor="#e2ad76"/>
+              <stop offset="85%" stopColor="#d49a59"/>
+              <stop offset="100%" stopColor="#965a25"/>
+            </linearGradient>
+            <linearGradient id="creaseGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#8a4f1c"/>
+              <stop offset="100%" stopColor="#e2ad76" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
 
-          {/* Ring Finger (Mid-Left) - taller */}
-          <path d="M 130 220 C 110 90, 190 80, 190 220" fill="#d49a59" />
-          {/* Ring Pad Crease */}
-          <path d="M 145 120 Q 170 105 175 135" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+          {/* Pinky */}
+          <path d="M 70 200 C 50 120, 80 80, 100 80 C 120 80, 120 120, 110 200" fill="url(#fingerGrad)"/>
+          <path d="M 80 110 Q 100 120 115 110" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+          <path d="M 75 140 Q 100 150 112 140" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+          
+          {/* Ring Finger */}
+          <path d="M 125 200 C 115 80, 150 40, 175 40 C 200 40, 205 80, 185 200" fill="url(#fingerGrad)"/>
+          <path d="M 140 80 Q 165 95 185 80" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+          <path d="M 135 120 Q 165 135 180 120" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
 
-          {/* Middle Finger (Mid-Right) - tallest */}
-          <path d="M 210 220 C 190 60, 270 60, 260 220" fill="#d49a59" />
-          {/* Middle Pad Crease */}
-          <path d="M 225 100 Q 250 85 245 120" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+          {/* Middle Finger */}
+          <path d="M 200 200 C 195 60, 230 20, 260 20 C 290 20, 290 60, 270 200" fill="url(#fingerGrad)"/>
+          <path d="M 215 70 Q 245 85 270 70" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+          <path d="M 210 110 Q 245 125 265 110" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
 
-          {/* Index Finger (Far Right) - angled outward slightly */}
-          <path d="M 280 220 C 310 90, 390 110, 350 220" fill="#d49a59" />
-          {/* Index Pad Crease */}
-          <path d="M 310 135 Q 340 120 330 155" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+          {/* Index Finger */}
+          <path d="M 285 200 C 290 80, 330 40, 360 40 C 390 40, 370 80, 345 200" fill="url(#fingerGrad)"/>
+          <path d="M 310 80 Q 335 95 365 80" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
+          <path d="M 305 120 Q 335 135 355 120" stroke="url(#creaseGrad)" strokeWidth="3" fill="none" strokeLinecap="round"/>
         </svg>
       </div>
 
+      {/* 🃏 THE CARDS */}
       <Reorder.Group
         axis="x"
         values={order}
@@ -141,21 +154,44 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ THE THUMB IN FRONT OF THE CARDS */}
-      {/* z-[100] keeps the thumb strictly in front of everything */}
-      <div className="absolute -bottom-8 left-1/2 -translate-x-[40%] z-[100] pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]">
-        <svg width="180" height="140" viewBox="0 0 180 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Palm/Base of Hand wrapping around the back */}
-          <path d="M10 140C20 90 40 60 80 60C110 60 140 80 150 140H10Z" fill="#e0ac69" />
+      {/* ✋ 3D THUMB (IN FRONT OF THE CARDS) */}
+      {/* z-[250] ensures it stays in front even while dragging a card (z-200) */}
+      <div className="absolute -bottom-8 left-1/2 -translate-x-[40%] z-[250] pointer-events-none drop-shadow-[0_15px_25px_rgba(0,0,0,0.7)]">
+        <svg width="220" height="180" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="thumbTip" cx="40%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#f5c796"/>
+              <stop offset="70%" stopColor="#d49455"/>
+              <stop offset="100%" stopColor="#a36324"/>
+            </radialGradient>
+            <linearGradient id="palmGrad" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0%" stopColor="#b3763c"/>
+              <stop offset="100%" stopColor="#e2ad76"/>
+            </linearGradient>
+            <linearGradient id="nailGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#ffeadd"/>
+              <stop offset="100%" stopColor="#e6ab91"/>
+            </linearGradient>
+            <filter id="thumbShadow">
+              <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000" floodOpacity="0.4"/>
+            </filter>
+          </defs>
           
-          {/* The Thumb curling firmly over the front cards */}
-          <path d="M70 140C70 80 85 30 115 25C140 20 155 40 140 75C130 100 120 140 120 140H70Z" fill="#f1c27d" />
+          {/* Base Palm */}
+          <path d="M -20 180 C 20 80, 80 70, 110 70 C 150 70, 160 120, 180 180 Z" fill="url(#palmGrad)"/>
           
-          {/* Knuckle crease for realism */}
-          <path d="M85 75C95 70 115 75 125 85" stroke="#c48b4b" strokeWidth="3" strokeLinecap="round" />
+          {/* Thumb curling over with built-in SVG drop shadow */}
+          <path d="M 160 180 C 170 120, 160 80, 140 40 C 120 0, 80 10, 70 40 C 60 70, 80 110, 110 180 Z" fill="url(#thumbTip)" filter="url(#thumbShadow)"/>
           
-          {/* Thumbnail */}
-          <path d="M110 35C105 30 115 25 125 28C132 30 130 42 120 40C115 39 110 38 110 35Z" fill="#f8e0c5" />
+          {/* Deep Knuckle Creases */}
+          <path d="M 90 90 Q 110 80 130 95" stroke="#965a25" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
+          <path d="M 85 105 Q 110 95 125 110" stroke="#965a25" strokeWidth="2" fill="none" strokeLinecap="round"/>
+          
+          {/* Glossy Thumbnail */}
+          <path d="M 80 40 C 75 25, 85 10, 100 15 C 115 20, 115 35, 110 45 C 100 50, 85 50, 80 40 Z" fill="url(#nailGrad)"/>
+          
+          {/* Specular White Highlight on the Nail */}
+          <path d="M 85 30 C 85 20, 95 15, 100 18" stroke="#ffffff" strokeWidth="2.5" strokeOpacity="0.75" fill="none" strokeLinecap="round"/>
         </svg>
       </div>
 
