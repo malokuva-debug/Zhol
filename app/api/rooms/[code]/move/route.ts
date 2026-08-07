@@ -288,14 +288,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
                 };
              });
 
-             let highestScore = -1;
-             let winnerIdx = seatIdx;
-             activeSeats.forEach(i => {
-                if (room.seats[i]!.score > highestScore) { highestScore = room.seats[i]!.score; winnerIdx = i; }
+            // FIXED: Find the actual round winner based on points earned THIS round
+             let highestRoundScore = -1;
+             let roundWinnerIdx = seatIdx; 
+             
+             pointsBySeat.forEach(p => {
+               if (!p.eliminated && p.deadwood > highestRoundScore) {
+                 highestRoundScore = p.deadwood;
+                 roundWinnerIdx = p.seatIdx;
+               }
              });
 
              room.game.turnPhase = "round_over";
-             room.game.lastRoundEnd = { type: "PISHPIRIK", winnerIdx, winnerBonus: 0, pointsBySeat };
+             room.game.lastRoundEnd = { type: "PISHPIRIK", winnerIdx: roundWinnerIdx, winnerBonus: 0, pointsBySeat };
           }
         }
       }
