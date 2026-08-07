@@ -208,4 +208,12 @@ export interface ClientGameState {
   pendingRemoval?: boolean;
   pishpirikCardsBySeat?: Record<number, string[]>;
   recentPishpirik?: { cardId: string; at: number };
+  
+  // ADDED: Missing property that caused the Vercel build to fail
+  recentCapture?: {
+    playedCard: string;
+    capturedCards: string[];
+    capturerIdx: number;
+    at: number;
+  };
 }
