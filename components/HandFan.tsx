@@ -65,7 +65,7 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ BACK LAYER: Changed to z-[0] and moved up to bottom-[-285px] */}
+      {/* 🖐️ BACK LAYER */}
       <div className="absolute bottom-[-285px] left-1/2 -translate-x-[45%] z-[0] pointer-events-none drop-shadow-md w-36 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <g id="Hand-Back">
@@ -139,8 +139,8 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ FRONT LAYER: Moved up to bottom-[-285px] to match */}
-      <div className="absolute bottom-[-285px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto">
+      {/* ✋ FRONT LAYER: Thumb lowered slightly to bottom-[-298px] */}
+      <div className="absolute bottom-[-298px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <g id="Thumb">
             <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 71.53 16.68 14.9-42.39 17.86-42.39 17.86z"/>
