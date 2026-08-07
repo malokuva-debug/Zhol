@@ -41,7 +41,8 @@ function MiniCard({ cardId }: { cardId: string }) {
 function DeadwoodRow({ 
   name, 
   deadwood, 
-  deadCards, 
+  deadCards,
+  pishpirikCards, 
   melds, 
   eliminated, 
   isWinner,
@@ -50,7 +51,8 @@ function DeadwoodRow({
 }: { 
   name: string; 
   deadwood: number; 
-  deadCards: string[]; 
+  deadCards: string[];
+  pishpirikCards?: string[]; 
   melds: any[]; 
   eliminated: boolean; 
   isWinner: boolean;
