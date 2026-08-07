@@ -65,8 +65,8 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ BACK LAYER: Pushed way down to bottom-[-310px] */}
-      <div className="absolute bottom-[-310px] left-1/2 -translate-x-[45%] z-[1] pointer-events-none drop-shadow-md w-36 h-auto">
+      {/* 🖐️ BACK LAYER: Changed to z-[0] and moved up to bottom-[-285px] */}
+      <div className="absolute bottom-[-285px] left-1/2 -translate-x-[45%] z-[0] pointer-events-none drop-shadow-md w-36 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <g id="Hand-Back">
             <path id="Shape-1" fillRule="evenodd" fill="#ffca7e" d="m369.92 1444.62c0 0 34.1-235.01 34.69-248.71 0.6-13.71 14.9-92.96 28.61-144.21 13.7-51.25-101.9-115.01-117.4-106.67-15.49 8.35-71.5 45.29-75.67 85.81 0 0 32.77 56.02 35.15 85.22 2.39 29.2-13.7 70.91 10.13 93.55-22.04 127.52-63.16 184.13-63.16 184.13z"/>
@@ -139,8 +139,8 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ FRONT LAYER: Pushed way down to bottom-[-310px] */}
-      <div className="absolute bottom-[-310px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto">
+      {/* ✋ FRONT LAYER: Moved up to bottom-[-285px] to match */}
+      <div className="absolute bottom-[-285px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <g id="Thumb">
             <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 71.53 16.68 14.9-42.39 17.86-42.39 17.86z"/>
