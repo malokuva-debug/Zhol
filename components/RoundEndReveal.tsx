@@ -63,8 +63,13 @@ function DeadwoodRow({
   const showCards = isPishpirikGame ? deadCards.length > 0 : (!isWinner && deadCards.length > 0);
   const cardsLabel = isPishpirikGame ? "Captured Cards:" : "Deadwood:";
 
+  // Add dynamic neon background colors for the teams!
+  let bgStyle = isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700";
+  if (team === 1) bgStyle = "bg-neon-blue/10 border-neon-blue/30 shadow-[0_0_15px_rgba(77,216,255,0.2)]";
+  if (team === 2) bgStyle = "bg-neon-pink/10 border-neon-pink/30 shadow-[0_0_15px_rgba(255,91,200,0.2)]";
+
   return (
-    <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${isWinner ? "bg-emerald-900/20 border-emerald-500/30" : "bg-slate-800/80 border-slate-700"}`}>
+    <div className={`flex flex-col border p-4 rounded-xl mb-3 text-left ${bgStyle}`}>
       <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
         <span className="text-slate-200 font-bold text-lg flex items-center gap-2">
           {name} 
