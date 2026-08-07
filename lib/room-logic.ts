@@ -315,6 +315,7 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
     pendingRemoval: room.game.pendingRemoval,
     pishpirikCardsBySeat: room.game.pishpirikCardsBySeat,
     recentPishpirik: room.game.recentPishpirik,
+    recentCapture: room.game.recentCapture,
     recentGhostJack: room.game.recentGhostJack, // ADDED: Now everyone sees the ghost!
   };
 }
