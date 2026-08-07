@@ -812,13 +812,17 @@ function PishpirikBoard({
   useEffect(() => {
     if (game.recentCapture && game.recentCapture.at > Date.now() - 2500) {
       setCaptureAnim(game.recentCapture);
-      // Wait 1.5s for the animation to play, then clear it to show the real empty table
-      const timer = setTimeout(() => setCaptureAnim(null), 1500);
+      
+      // Is this capture ALSO a Pishpirik? (They happen at the exact same time)
+      const isEpic = game.recentPishpirik && Math.abs(game.recentPishpirik.at - game.recentCapture.at) < 500;
+      
+      // Wait 1.3s for a normal slide, but 1.9s for the epic levitating explosion!
+      const timer = setTimeout(() => setCaptureAnim(null), isEpic ? 1900 : 1300);
       return () => clearTimeout(timer);
     } else {
       setCaptureAnim(null);
     }
-  }, [game.recentCapture?.at]);
+  }, [game.recentCapture?.at, game.recentPishpirik?.at]);
 
   const is2v2 = room.rules.gameMode === "pishpirik" && room.maxPlayers === 4;
   const myTeam = room.seats[yourSeat]?.team ?? (yourSeat % 2 === 0 ? 1 : 2);
@@ -1077,39 +1081,85 @@ function PishpirikBoard({
 
           {/* 2. 🎬 The Sweep Animation Overlay! */}
           {captureAnim && (
-            <motion.div
-              initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
-              animate={{ 
-                // Swoop towards local graveyard (bottom-left) if it's us or our teammate! Else swoop away to enemy.
-                x: captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? -150 : 0, 
-                y: captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? 200 : -250, 
-                scale: 0.3, 
-                opacity: 0 
-              }}
-              // Waits 0.8 seconds before sweeping it away so you can see it slide under!
-              transition={{ delay: 0.8, duration: 0.5, ease: "easeIn" }}
-              className="absolute h-24 w-16 sm:h-28 sm:w-[4.5rem] z-50 flex justify-center items-center"
-            >
+            (() => {
+              const targetX = captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? -150 : 0;
+              const targetY = captureAnim.capturerIdx === yourSeat || (is2v2 && room.seats[captureAnim.capturerIdx]?.team === myTeam) ? 200 : -250;
               
-              {/* The Pile that was already on the table */}
-              {captureAnim.capturedCards.map((id: string, i: number) => (
-                <div key={"cap-" + id} className="absolute inset-0 drop-shadow-xl" style={{ zIndex: i + 1, transform: `translate(${i * 3}px, ${-i * 3}px) rotate(${i % 2 === 0 ? -2 : 2}deg)` }}>
-                  <PlayingCard id={id} />
-                </div>
-              ))}
-              
-              {/* The played card sliding elegantly UNDER the pile */}
-              <motion.div
-                initial={{ y: 80, scale: 1.1, opacity: 0 }}
-                animate={{ y: 0, scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                className="absolute inset-0 drop-shadow-lg"
-                style={{ zIndex: 0 }} // Z-INDEX 0 PUTS IT UNDER!
-              >
-                <PlayingCard id={captureAnim.playedCard} />
-              </motion.div>
-              
-            </motion.div>
+              // We detect if this capture was simultaneously a Pishpirik!
+              const isEpic = game.recentPishpirik && Math.abs(game.recentPishpirik.at - captureAnim.at) < 500;
+              const isJack = captureAnim.playedCard.startsWith("J_");
+
+              return (
+                <motion.div
+                  initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+                  animate={
+                    isEpic 
+                      ? { 
+                          x: [0, 0, 0, targetX], 
+                          y: [0, -50, -50, targetY], // Levitates up dramatically!
+                          scale: [1, 1.4, 1.4, 0.3], // Blows up huge!
+                          opacity: [1, 1, 1, 0] 
+                        }
+                      : { 
+                          x: [0, 0, targetX], 
+                          y: [0, 0, targetY], 
+                          scale: [1, 1, 0.3], 
+                          opacity: [1, 1, 0] 
+                        }
+                  }
+                  transition={
+                    isEpic
+                      // Times array creates the sequence: Pause -> Levitate & Hold -> Zip away
+                      ? { duration: 1.8, times: [0, 0.2, 0.7, 1], ease: "easeInOut" }
+                      : { duration: 1.2, times: [0, 0.6, 1], ease: "easeInOut" }
+                  }
+                  className={`absolute h-24 w-16 sm:h-28 sm:w-[4.5rem] z-50 flex justify-center items-center ${isEpic ? 'drop-shadow-[0_0_50px_rgba(255,91,200,1)]' : ''}`}
+                >
+                  
+                  {/* EPIC SHOCKWAVE EFFECT */}
+                  {isEpic && (
+                    <motion.div
+                      initial={{ scale: 0.5, opacity: 1, rotate: 0 }}
+                      animate={{ scale: 3.5, opacity: 0, rotate: 45 }}
+                      transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
+                      className={`absolute inset-[-20px] rounded-2xl border-4 ${isJack ? 'border-amber-400 bg-amber-400/20' : 'border-neon-pink bg-neon-pink/20'} pointer-events-none`}
+                      style={{ zIndex: -1 }}
+                    />
+                  )}
+
+                  {/* EPIC TEXT POPUP */}
+                  {isEpic && (
+                    <motion.div
+                      initial={{ scale: 0, y: 0, opacity: 0 }}
+                      animate={{ scale: 1.5, y: -80, opacity: [0, 1, 1, 0] }}
+                      transition={{ delay: 0.3, duration: 1.2, times: [0, 0.2, 0.8, 1] }}
+                      className={`absolute z-[100] font-black text-3xl italic tracking-widest whitespace-nowrap ${isJack ? 'text-amber-400 drop-shadow-[0_0_15px_#fbbf24]' : 'text-neon-pink drop-shadow-[0_0_15px_#ff5bc8]'}`}
+                    >
+                      {isJack ? "JACK PISHPIRIK!" : "PISHPIRIK!"}
+                    </motion.div>
+                  )}
+
+                  {/* The Pile that was already on the table */}
+                  {captureAnim.capturedCards.map((id: string, i: number) => (
+                    <div key={"cap-" + id} className="absolute inset-0 drop-shadow-xl" style={{ zIndex: i + 1, transform: `translate(${i * 3}px, ${-i * 3}px) rotate(${i % 2 === 0 ? -2 : 2}deg)` }}>
+                      <PlayingCard id={id} />
+                    </div>
+                  ))}
+                  
+                  {/* The played card sliding elegantly UNDER the pile */}
+                  <motion.div
+                    initial={{ y: 80, scale: 1.1, opacity: 0 }}
+                    animate={{ y: 0, scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="absolute inset-0 drop-shadow-lg"
+                    style={{ zIndex: 0 }}
+                  >
+                    <PlayingCard id={captureAnim.playedCard} />
+                  </motion.div>
+                  
+                </motion.div>
+              );
+            })()
           )}
 
         </div>
