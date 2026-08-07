@@ -112,6 +112,8 @@ export interface GameState {
   capturedBySeat?: Record<number, CardId[]>;
   pishpiriksBySeat?: Record<number, number>;
   lastCaptureIdx?: number;
+  pishpirikCardsBySeat?: Record<number, string[]>;
+  recentPishpirik?: { cardId: string; at: number };
 
   // --- CICMIC STATE ---
   board?: Record<number, CicmicCell>;
@@ -196,4 +198,6 @@ export interface ClientGameState {
   piecesOnBoard?: Record<CicmicPlayer, number>;
   cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
   pendingRemoval?: boolean;
+  pishpirikCardsBySeat?: Record<number, string[]>;
+  recentPishpirik?: { cardId: string; at: number };
 }
