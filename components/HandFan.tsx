@@ -65,44 +65,6 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ BACK LAYER: Folded fingers on the right side of the deck */}
-      <div className="absolute -bottom-16 left-1/2 -translate-x-[45%] -z-10 pointer-events-none drop-shadow-md">
-        <svg width="240" height="340" viewBox="0 0 240 340" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="#F4CA9E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="#FCE1C6">
-            {/* Index Finger */}
-            <path d="M 120 130 C 180 120, 190 170, 140 180" />
-            {/* Middle Finger */}
-            <path d="M 125 165 C 195 155, 205 205, 145 215" />
-            {/* Ring Finger */}
-            <path d="M 130 200 C 200 190, 210 240, 145 250" />
-            {/* Pinky Finger */}
-            <path d="M 130 235 C 190 225, 200 275, 140 285" />
-            
-            {/* Right Wrist Base Connection */}
-            <path d="M 135 270 C 150 280, 150 310, 140 340 L 100 340 Z" stroke="none" />
-            <path d="M 135 270 C 150 280, 150 310, 140 340" fill="none" />
-          </g>
-        </svg>
-      </div>
-
-      {/* 🃏 THE CARDS */}
-      <Reorder.Group
-        axis="x"
-        values={order}
-        onReorder={setOrder}
-        className="flex items-end justify-center px-4 py-3"
-        style={{ listStyle: "none" }}
-      >
-        {order.map((id, i) => {
-          const offset = i - center;
-          const rotate = offset * angleStep;
-          const isSelected = selectedCard === id;
-          const meldIdx = meldIndexByCard?.[id];
-          const ringClass = meldIdx !== undefined ? MELD_RING_COLORS[meldIdx % MELD_RING_COLORS.length] : "";
-
-          return (
-    <div className="relative w-full">
-      
       {/* 🖐️ BACK LAYER: The rest of the hand (Behind the cards) */}
       <div className="absolute -bottom-16 left-1/2 -translate-x-[45%] -z-10 pointer-events-none drop-shadow-md w-48 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
