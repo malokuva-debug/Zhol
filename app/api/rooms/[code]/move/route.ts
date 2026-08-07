@@ -174,25 +174,36 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
           const pishMap = room.game.pishpiriksBySeat;
           const enemyKey = is2v2 ? (myTeam === 1 ? 1 : 0) : activeSeats.find(i => i !== seatIdx && (pishMap[i] || 0) > 0);
 
-          // Save the exact card to show under the graveyard!
-          room.game.pishpirikCardsBySeat[teamGraveyardKey] = [
-            ...(room.game.pishpirikCardsBySeat[teamGraveyardKey] || []),
-            cardId
-          ];
           room.game.recentPishpirik = { cardId, at: Date.now() };
 
           if (enemyKey !== undefined && (pishMap[enemyKey] || 0) > 0) {
             const enemyCurrent = pishMap[enemyKey];
+            
             if (enemyCurrent > pishPts) {
+              // Enemy had more points (e.g. Jack vs Normal). Deduct points & pop 1 visual card.
               pishMap[enemyKey] -= pishPts;
+              if (room.game.pishpirikCardsBySeat?.[enemyKey]) room.game.pishpirikCardsBySeat[enemyKey].pop();
             } else if (enemyCurrent < pishPts) {
+              // We overpowered them (e.g. Jack vs Normal). Clear theirs, we keep leftover points & card.
               pishMap[enemyKey] = 0;
               pishMap[teamGraveyardKey] = (pishMap[teamGraveyardKey] || 0) + (pishPts - enemyCurrent);
+              room.game.pishpirikCardsBySeat[enemyKey] = [];
+              room.game.pishpirikCardsBySeat[teamGraveyardKey] = [
+                ...(room.game.pishpirikCardsBySeat[teamGraveyardKey] || []),
+                cardId
+              ];
             } else {
+              // Exact cancel (10 vs 10 or 20 vs 20). Clear points & visual cards for enemy!
               pishMap[enemyKey] = 0;
+              room.game.pishpirikCardsBySeat[enemyKey] = [];
             }
           } else {
+            // No enemy pishpirik to cancel! Score points normally and show our face-up card.
             pishMap[teamGraveyardKey] = (pishMap[teamGraveyardKey] || 0) + pishPts;
+            room.game.pishpirikCardsBySeat[teamGraveyardKey] = [
+              ...(room.game.pishpirikCardsBySeat[teamGraveyardKey] || []),
+              cardId
+            ];
           }
         }
       } else {
