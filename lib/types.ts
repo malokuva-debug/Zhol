@@ -112,6 +112,7 @@ export interface GameState {
   capturedBySeat?: Record<number, CardId[]>;
   pishpiriksBySeat?: Record<number, number>;
   lastCaptureIdx?: number;
+  recentGhostJack?: { cardId: string; at: number };
   pishpirikCardsBySeat?: Record<number, string[]>;
   recentPishpirik?: { cardId: string; at: number };
 
@@ -194,6 +195,7 @@ export interface ClientGameState {
   capturedBySeat?: Record<number, CardId[]>;
   pishpiriksBySeat?: Record<number, number>;
   board?: Record<number, CicmicCell>;
+  recentGhostJack?: { cardId: string; at: number };
   unplacedPieces?: Record<CicmicPlayer, number>;
   piecesOnBoard?: Record<CicmicPlayer, number>;
   cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
