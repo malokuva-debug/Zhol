@@ -115,15 +115,20 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ THE HAND HOLDING THE CARDS */}
-      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none text-white/10 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-        <svg width="160" height="90" viewBox="0 0 160 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-          {/* Base of the palm wrapping around */}
-          <path d="M-10 90C5 45 45 35 80 55V90H-10Z" fill="currentColor" />
-          {/* The Thumb clamping down on the center cards */}
-          <path d="M70 90C70 50 85 20 110 15C130 11 140 25 130 50C123 68 105 90 105 90H70Z" fill="currentColor" />
-          {/* Sleek highlight to make it pop like glass/neon */}
-          <path d="M70 90C70 50 85 20 110 15" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" />
+      {/* ✋ THE ACTUAL HAND HOLDING THE CARDS */}
+      <div className="absolute -bottom-8 left-1/2 -translate-x-[40%] z-[100] pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]">
+        <svg width="180" height="140" viewBox="0 0 180 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Palm/Base of Hand wrapping around the back */}
+          <path d="M10 140C20 90 40 60 80 60C110 60 140 80 150 140H10Z" fill="#e0ac69" />
+          
+          {/* The Thumb curling firmly over the front cards */}
+          <path d="M70 140C70 80 85 30 115 25C140 20 155 40 140 75C130 100 120 140 120 140H70Z" fill="#f1c27d" />
+          
+          {/* Knuckle crease for realism */}
+          <path d="M85 75C95 70 115 75 125 85" stroke="#c48b4b" strokeWidth="3" strokeLinecap="round" />
+          
+          {/* Thumbnail */}
+          <path d="M110 35C105 30 115 25 125 28C132 30 130 42 120 40C115 39 110 38 110 35Z" fill="#f8e0c5" />
         </svg>
       </div>
     </div>
