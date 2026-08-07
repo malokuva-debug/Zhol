@@ -249,43 +249,21 @@ export default function RoundEndReveal({ room, gameState, isHost, onNextRound, o
           )}
           
           <div className="space-y-4 mb-8 mt-4">
-            {is2v2 ? (
-              <div className="flex flex-col gap-6 text-center w-full mx-auto">
-                <div className="bg-neon-blue/10 border border-neon-blue/30 p-6 rounded-xl shadow-[0_0_15px_rgba(77,216,255,0.2)]">
-                  <div className="text-lg font-bold text-white mb-2">
-                    {team1Players.join(" & ")} Team
-                  </div>
-                  <div className="text-4xl font-black text-neon-blue-soft">
-                    {team1Score} pts
-                  </div>
-                </div>
-
-                <div className="bg-neon-pink/10 border border-neon-pink/30 p-6 rounded-xl shadow-[0_0_15px_rgba(255,91,200,0.2)]">
-                  <div className="text-lg font-bold text-white mb-2">
-                    {team2Players.join(" & ")} Team
-                  </div>
-                  <div className="text-4xl font-black text-neon-pink">
-                    {team2Score} pts
-                  </div>
-                </div>
-              </div>
-            ) : (
-              displayRows.map((row) => (
-                <DeadwoodRow 
-                  key={row.key}
-                  name={row.name}
-                  deadwood={row.deadwood}
-                  deadCards={row.deadCards}
-                  melds={row.melds}
-                  eliminated={row.eliminated}
-                  isWinner={row.isWinner}
-                  isPishpirikGame={isPishpirikGame}
-                  team={row.team}
-                />
-              ))
-            )}
+            {/* Maps the aggregated team rows OR individual rows, showing ALL captured cards! */}
+            {displayRows.map((row) => (
+              <DeadwoodRow 
+                key={row.key}
+                name={row.name}
+                deadwood={row.deadwood}
+                deadCards={row.deadCards}
+                melds={row.melds}
+                eliminated={row.eliminated}
+                isWinner={row.isWinner}
+                isPishpirikGame={isPishpirikGame}
+                team={row.team}
+              />
+            ))}
           </div>
-
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
