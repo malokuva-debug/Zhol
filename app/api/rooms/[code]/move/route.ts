@@ -156,6 +156,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
       if (!room.game.capturedBySeat) room.game.capturedBySeat = {};
       if (!room.game.pishpiriksBySeat) room.game.pishpiriksBySeat = {};
+      if (!room.game.pishpirikCardsBySeat) room.game.pishpirikCardsBySeat = {};
 
       const teamGraveyardKey = is2v2 ? (myTeam === 1 ? 0 : 1) : seatIdx;
 
@@ -169,10 +170,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
         room.game.lastCaptureIdx = seatIdx;
 
         if (isPishpirik) {
-          // 20 Points for Jack-on-Jack, 10 for normal
           const pishPts = isJackPishpirik ? 20 : 10;
           const pishMap = room.game.pishpiriksBySeat;
           const enemyKey = is2v2 ? (myTeam === 1 ? 1 : 0) : activeSeats.find(i => i !== seatIdx && (pishMap[i] || 0) > 0);
+
+          // Save the exact card to show under the graveyard!
+          room.game.pishpirikCardsBySeat[teamGraveyardKey] = [
+            ...(room.game.pishpirikCardsBySeat[teamGraveyardKey] || []),
+            cardId
+          ];
+          room.game.recentPishpirik = { cardId, at: Date.now() };
 
           if (enemyKey !== undefined && (pishMap[enemyKey] || 0) > 0) {
             const enemyCurrent = pishMap[enemyKey];
@@ -200,7 +207,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.seats[i]!.hand = room.game.deck.splice(0, 4);
           }
         } else {
-          // 1. SWEEP THE TABLE: Remaining cards go to the last person/team to capture
+          // SWEEP TABLE: Remaining cards go to the last person/team to capture
           if (room.game.tablePile.length > 0 && room.game.lastCaptureIdx !== undefined) {
             const lastTeam = room.seats[room.game.lastCaptureIdx]?.team ?? (room.game.lastCaptureIdx % 2 === 0 ? 1 : 2);
             const sweepKey = is2v2 ? (lastTeam === 1 ? 0 : 1) : room.game.lastCaptureIdx;
@@ -211,7 +218,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             room.game.tablePile = [];
           }
 
-          // Calculate Team Round Points
+          // MOST CARDS BONUS & SCORING
           if (is2v2) {
             const team1Captured = room.game.capturedBySeat[0] || [];
             const team2Captured = room.game.capturedBySeat[1] || [];
@@ -219,38 +226,63 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             let team1Pts = scorePishpirikCards(team1Captured) + (room.game.pishpiriksBySeat[0] || 0);
             let team2Pts = scorePishpirikCards(team2Captured) + (room.game.pishpiriksBySeat[1] || 0);
 
-            // 2. MOST CARDS BONUS: +3 Points for the team that took the most cards
-            if (team1Captured.length > team2Captured.length) {
-              team1Pts += 3;
-            } else if (team2Captured.length > team1Captured.length) {
-              team2Pts += 3;
-            }
+            // +3 Bonus for most cards!
+            if (team1Captured.length > team2Captured.length) team1Pts += 3;
+            else if (team2Captured.length > team1Captured.length) team2Pts += 3;
 
-            // Add team points to both members of each team
             room.seats.forEach((s, idx) => {
-              if (s) {
-                const t = s.team ?? (idx % 2 === 0 ? 1 : 2);
-                s.score += (t === 1 ? team1Pts : team2Pts);
-              }
+              if (s) s.score += (s.team === 1 ? team1Pts : team2Pts);
             });
 
             const pointsBySeat = room.seats.map((s, idx) => ({
               seatIdx: idx,
               deadwood: s ? (s.team === 1 ? team1Pts : team2Pts) : 0,
               deadCards: s ? (s.team === 1 ? team1Captured : team2Captured) : [],
+              pishpirikCards: s ? (s.team === 1 ? (room.game.pishpirikCardsBySeat?.[0] || []) : (room.game.pishpirikCardsBySeat?.[1] || [])) : [],
               melds: [],
               eliminated: false,
               team: s?.team
             }));
 
-            const winnerIdx = team1Pts >= team2Pts ? 0 : 1;
             room.game.turnPhase = "round_over";
-            room.game.lastRoundEnd = {
-              type: "PISHPIRIK",
-              winnerIdx,
-              winnerBonus: 0,
-              pointsBySeat
-            };
+            room.game.lastRoundEnd = { type: "PISHPIRIK", winnerIdx: team1Pts >= team2Pts ? 0 : 1, winnerBonus: 0, pointsBySeat };
+          } else {
+             // Free for all Pishpirik Logic
+             let maxCards = 0;
+             let maxSeat = -1;
+             activeSeats.forEach(i => {
+                const count = (room.game.capturedBySeat[i] || []).length;
+                if (count > maxCards) { maxCards = count; maxSeat = i; }
+                else if (count === maxCards) { maxSeat = -1; }
+             });
+
+             const pointsBySeat = room.seats.map((s, idx) => {
+                if (!activeSeats.includes(idx)) return { seatIdx: idx, deadwood: 0, deadCards: [], pishpirikCards: [], melds: [], eliminated: true, team: undefined };
+                
+                const captured = room.game.capturedBySeat[idx] || [];
+                let pts = scorePishpirikCards(captured) + (room.game.pishpiriksBySeat[idx] || 0);
+                if (idx === maxSeat) pts += 3;
+                if (s) s.score += pts;
+
+                return {
+                   seatIdx: idx,
+                   deadwood: pts,
+                   deadCards: captured,
+                   pishpirikCards: room.game.pishpirikCardsBySeat[idx] || [],
+                   melds: [],
+                   eliminated: false,
+                   team: s?.team
+                };
+             });
+
+             let highestScore = -1;
+             let winnerIdx = seatIdx;
+             activeSeats.forEach(i => {
+                if (room.seats[i]!.score > highestScore) { highestScore = room.seats[i]!.score; winnerIdx = i; }
+             });
+
+             room.game.turnPhase = "round_over";
+             room.game.lastRoundEnd = { type: "PISHPIRIK", winnerIdx, winnerBonus: 0, pointsBySeat };
           }
         }
       }
@@ -262,7 +294,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       result = { ok: true };
       break;
     }
-    // ... Cicmic cases remain identical
+
     case "cicmic_place": { /* omitted for brevity, keeping original logic below */
       const board = room.game.board || {};
       const pt = parsed.data.point;
