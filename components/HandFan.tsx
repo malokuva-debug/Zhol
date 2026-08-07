@@ -65,31 +65,33 @@ export default function HandFan({
   return (
     <div className="relative w-full">
       
-      {/* 🖐️ BACK LAYER - clipPath prevents layout overflow below bottom boundary */}
-      <div 
-        className="absolute bottom-[-285px] left-1/2 -translate-x-[45%] z-[0] pointer-events-none drop-shadow-md w-36 h-auto"
-        style={{ clipPath: "inset(-500px -100px 285px -100px)" }}
-      >
-        <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <g id="Hand-Back">
-            <path id="Shape-1" fillRule="evenodd" fill="#ffca7e" d="m369.92 1444.62c0 0 34.1-235.01 34.69-248.71 0.6-13.71 14.9-92.96 28.61-144.21 13.7-51.25-101.9-115.01-117.4-106.67-15.49 8.35-71.5 45.29-75.67 85.81 0 0 32.77 56.02 35.15 85.22 2.39 29.2-13.7 70.91 10.13 93.55-22.04 127.52-63.16 184.13-63.16 184.13z"/>
-            <path id="Shape-1-copy" fillRule="evenodd" fill="#ffca7e" stroke="#000000" strokeMiterlimit={100} d="m369.92 1444.62c0 0 34.1-235.01 34.69-248.71 0.6-13.71 14.9-92.96 28.61-144.21 13.7-51.25-101.9-115.01-117.4-106.67-15.49 8.35-71.5 45.29-75.67 85.81 0 0 32.77 56.02 35.15 85.22 2.39 29.2-13.7 70.91 10.13 93.55-22.04 127.52-63.16 184.13-63.16 184.13z"/>
-            <path id="Shape-8" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m266.89 1069.14c0 0 20.93-10.3 23.18-15.13"/>
-            <path id="Shape-19" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m259.32 992.56c0 0 44.7 73.38 42.49 90.48"/>
-            <path id="Shape-20" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m354.78 1017.94l-4.42-21.52c0 0-8.82-14.35-19.86-13.8"/>
-            <path id="Shape-9" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m248.22 1034.05c0 0 15.77-8.05 18.67-12.87"/>
-            <path id="Shape-10" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m287.17 1030.83c0 0 11.27-3.86 13.85-9.01"/>
-            <path id="Shape-11" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m374.1 1066.25c0 0 24.79 45.07 28.97 75.01"/>
-            <path id="Shape-12" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m370.24 1049.51l39.59 41.21"/>
-            <path id="Shape-13" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m371.52 1041.78c0 0 48.94 0.64 49.9-5.8"/>
-            <path id="Shape-14" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m370.88 1034.38c0 0 29.62-13.2 45.72-9.34"/>
-            <path id="Shape-15" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m355.75 1018.28c0 0 33.8-18.03 34.45-23.5"/>
-            <path id="Shape-16" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m272.69 1109.07l22.85-18.35"/>
-            <path id="Shape-17" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m279.77 1114.22l20.93-16.1"/>
-            <path id="Shape-18" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m294.26 1218.85c0 0 21.89 0 28.65 2.9 6.76 2.89 26.72-5.15 26.72-5.15"/>
-          </g>
-        </svg>
-      </div>
+      {/* 🖐️ BACK LAYER: Only renders when there are cards in hand */}
+      {n > 0 && (
+        <div 
+          className="absolute bottom-[-241px] left-1/2 -translate-x-[45%] z-[0] pointer-events-none drop-shadow-md w-32 h-auto"
+          style={{ clipPath: "inset(-500px -100px 241px -100px)" }}
+        >
+          <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <g id="Hand-Back">
+              <path id="Shape-1" fillRule="evenodd" fill="#ffca7e" d="m369.92 1444.62c0 0 34.1-235.01 34.69-248.71 0.6-13.71 14.9-92.96 28.61-144.21 13.7-51.25-101.9-115.01-117.4-106.67-15.49 8.35-71.5 45.29-75.67 85.81 0 0 32.77 56.02 35.15 85.22 2.39 29.2-13.7 70.91 10.13 93.55-22.04 127.52-63.16 184.13-63.16 184.13z"/>
+              <path id="Shape-1-copy" fillRule="evenodd" fill="#ffca7e" stroke="#000000" strokeMiterlimit={100} d="m369.92 1444.62c0 0 34.1-235.01 34.69-248.71 0.6-13.71 14.9-92.96 28.61-144.21 13.7-51.25-101.9-115.01-117.4-106.67-15.49 8.35-71.5 45.29-75.67 85.81 0 0 32.77 56.02 35.15 85.22 2.39 29.2-13.7 70.91 10.13 93.55-22.04 127.52-63.16 184.13-63.16 184.13z"/>
+              <path id="Shape-8" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m266.89 1069.14c0 0 20.93-10.3 23.18-15.13"/>
+              <path id="Shape-19" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m259.32 992.56c0 0 44.7 73.38 42.49 90.48"/>
+              <path id="Shape-20" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m354.78 1017.94l-4.42-21.52c0 0-8.82-14.35-19.86-13.8"/>
+              <path id="Shape-9" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m248.22 1034.05c0 0 15.77-8.05 18.67-12.87"/>
+              <path id="Shape-10" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m287.17 1030.83c0 0 11.27-3.86 13.85-9.01"/>
+              <path id="Shape-11" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m374.1 1066.25c0 0 24.79 45.07 28.97 75.01"/>
+              <path id="Shape-12" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m370.24 1049.51l39.59 41.21"/>
+              <path id="Shape-13" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m371.52 1041.78c0 0 48.94 0.64 49.9-5.8"/>
+              <path id="Shape-14" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m370.88 1034.38c0 0 29.62-13.2 45.72-9.34"/>
+              <path id="Shape-15" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m355.75 1018.28c0 0 33.8-18.03 34.45-23.5"/>
+              <path id="Shape-16" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m272.69 1109.07l22.85-18.35"/>
+              <path id="Shape-17" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m279.77 1114.22l20.93-16.1"/>
+              <path id="Shape-18" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m294.26 1218.85c0 0 21.89 0 28.65 2.9 6.76 2.89 26.72-5.15 26.72-5.15"/>
+            </g>
+          </svg>
+        </div>
+      )}
 
       {/* 🃏 THE CARDS */}
       <Reorder.Group
@@ -142,24 +144,26 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ FRONT LAYER - clipPath prevents layout overflow below bottom boundary */}
-      <div 
-        className="absolute bottom-[-298px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto"
-        style={{ clipPath: "inset(-500px -100px 298px -100px)" }}
-      >
-        <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <g id="Thumb">
-            <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 79.53 120.68 300.9-42.39 300.86-42.39 300.86z"/>
-            <path id="Shape-3" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m349.19 1019.52c0 0 18.48 16.69 19.07 32.78 0.6 16.08 45.89 103.09-1.19 151.35"/>
-            <path id="Shape-21" fillRule="evenodd" fill="#ffffff" opacity={0.6} d="m288.38 958.23l-2.44-1.16-2.74-1.93-1.12-2.39-1.93-5.43-0.41-3.4 0.26-6.35c0 0 0.05-9.34 8.88-14.77 10.16-3.86 19.3 5.73 22.65 10.35l0.91 3.25 3.71 15.79-1.78-0.45-2.69-0.11-6.09 0.41-5.39 1.57-6.24 2.29z"/>
-            <path id="Shape-4" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m275.9 974.23c0 0 16.68 34.57 33.37 62.57 0 0-1.19 35.16-6.56 44.1-5.36 8.94-1.78 45.29 2.98 50.05 4.77 4.77-16.08 45.89-16.08 45.89"/>
-            <path id="Shape-5" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m305.69 987.94c0 0 13.11-9.54 25.03-7.15"/>
-            <path id="Shape-6" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m309.87 1003.43c0 0 23.83 2.98 25.02-4.77"/>
-            <path id="Shape-7" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m280.07 937.29c0 0-2.98 17.87 8.34 20.85 0 0 18.08-9.4 27.74-5.86l-4.51-19.32"/>
-            <path id="Shape-23" fillRule="evenodd" fill="#ffca7e" stroke="#000000" strokeMiterlimit={100} d="m318.36 944.62c0 0 8.04 41.15 31.22 75.69"/>
-          </g>
-        </svg>
-      </div>
+      {/* ✋ FRONT LAYER: Only renders when there are cards in hand */}
+      {n > 0 && (
+        <div 
+          className="absolute bottom-[-254px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-32 h-auto"
+          style={{ clipPath: "inset(-500px -100px 254px -100px)" }}
+        >
+          <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <g id="Thumb">
+              <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 79.53 120.68 300.9-42.39 300.86-42.39 300.86z"/>
+              <path id="Shape-3" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m349.19 1019.52c0 0 18.48 16.69 19.07 32.78 0.6 16.08 45.89 103.09-1.19 151.35"/>
+              <path id="Shape-21" fillRule="evenodd" fill="#ffffff" opacity={0.6} d="m288.38 958.23l-2.44-1.16-2.74-1.93-1.12-2.39-1.93-5.43-0.41-3.4 0.26-6.35c0 0 0.05-9.34 8.88-14.77 10.16-3.86 19.3 5.73 22.65 10.35l0.91 3.25 3.71 15.79-1.78-0.45-2.69-0.11-6.09 0.41-5.39 1.57-6.24 2.29z"/>
+              <path id="Shape-4" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m275.9 974.23c0 0 16.68 34.57 33.37 62.57 0 0-1.19 35.16-6.56 44.1-5.36 8.94-1.78 45.29 2.98 50.05 4.77 4.77-16.08 45.89-16.08 45.89"/>
+              <path id="Shape-5" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m305.69 987.94c0 0 13.11-9.54 25.03-7.15"/>
+              <path id="Shape-6" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m309.87 1003.43c0 0 23.83 2.98 25.02-4.77"/>
+              <path id="Shape-7" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m280.07 937.29c0 0-2.98 17.87 8.34 20.85 0 0 18.08-9.4 27.74-5.86l-4.51-19.32"/>
+              <path id="Shape-23" fillRule="evenodd" fill="#ffca7e" stroke="#000000" strokeMiterlimit={100} d="m318.36 944.62c0 0 8.04 41.15 31.22 75.69"/>
+            </g>
+          </svg>
+        </div>
+      )}
 
     </div>
   );
