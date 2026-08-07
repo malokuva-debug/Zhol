@@ -207,6 +207,5 @@ export interface ClientGameState {
   cicmicPhase?: Record<CicmicPlayer, CicmicPhase>;
   pendingRemoval?: boolean;
   pishpirikCardsBySeat?: Record<number, string[]>;
-  recentCapture: room.game.recentCapture,
   recentPishpirik?: { cardId: string; at: number };
 }
