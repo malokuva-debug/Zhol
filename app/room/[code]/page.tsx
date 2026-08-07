@@ -811,6 +811,21 @@ function PishpirikBoard({
 
   let myCaptured: string[] = [];
   let myPishPts = 0;
+  let myPishCards: string[] = [];
+  if (is2v2) {
+    myPishCards = game.pishpirikCardsBySeat?.[myTeam === 1 ? 0 : 1] || [];
+  } else {
+    myPishCards = game.pishpirikCardsBySeat?.[yourSeat] || [];
+  }
+
+  // GLOBAL PISHPIRIK ANIMATION (For all players)
+  useEffect(() => {
+    if (game.recentPishpirik && game.recentPishpirik.at > Date.now() - 3000) {
+      setShowPishpirikAnim(true);
+      const timer = setTimeout(() => setShowPishpirikAnim(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [game.recentPishpirik?.at]);
 
   if (is2v2) {
     // Shared Graveyard: Team 1 reads key 0, Team 2 reads key 1
@@ -842,22 +857,13 @@ function PishpirikBoard({
     });
   }
 
-  async function playCard(cardId: string) {
+ async function playCard(cardId: string) {
     setActionError("");
 
     const { rank } = parseCardId(cardId);
     if (rank === "J" && tablePile.length === 0) {
       setShowSkull(true);
       setTimeout(() => setShowSkull(false), 2000);
-    }
-
-    if (tablePile.length === 1) {
-      const topRank = parseCardId(tablePile[0]).rank;
-      // STRICT CHECK: J on non-J is no longer a Pishpirik
-      if (rank === topRank) {
-         setShowPishpirikAnim(true);
-         setTimeout(() => setShowPishpirikAnim(false), 2500);
-      }
     }
 
     const res = await fetch(`/api/rooms/${code}/move`, {
@@ -974,29 +980,29 @@ function PishpirikBoard({
       </div>
       
       <div className="felt-table relative rounded-3xl p-6">
-        <div className="flex items-center justify-between text-xs text-white/50">
+        <div className="flex items-center text-xs text-white/50">
           <span>Pishpirik</span>
-          <span className="text-white/30">{tablePile.length === 0 ? "Table empty" : `Pile: ${tablePile.length} card${tablePile.length === 1 ? "" : "s"}`}</span>
         </div>
 
-        {/* Deck Count */}
-        <div className="absolute right-4 top-4 text-xs font-bold text-white/50 bg-black/30 px-3 py-1.5 rounded-full border border-white/5 z-10">
-           Deck: {game.deck.length}
+        {/* OVERLAP FIX: Group the Deck and Pile count tightly in the top right */}
+        <div className="absolute right-4 top-4 flex flex-col items-end gap-1.5 z-10">
+           <span className="text-white/40 text-xs font-semibold">{tablePile.length === 0 ? "Table empty" : `Pile: ${tablePile.length} card${tablePile.length === 1 ? "" : "s"}`}</span>
+           <div className="text-xs font-bold text-white/50 bg-black/30 px-3 py-1.5 rounded-full border border-white/5">
+             Deck: {game.deck.length}
+           </div>
         </div>
 
-        {/* Captured Cards Button */}
+        {/* Captured Cards & Pishpiriks */}
         <div className="absolute left-4 top-4 z-10">
            {myCaptured.length > 0 && (
              <button onClick={() => setShowGraveyard(true)} className="flex flex-col items-center group relative">
                
-               {/* FACE UP PISHPIRIK INDICATOR: Sideways card sticking out under the deck */}
-               {myPishPts > 0 && (
-                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90 z-0 shadow-lg">
-                   <div className="h-16 w-11 bg-gradient-to-br from-white to-slate-200 rounded border border-slate-300 flex items-center justify-center">
-                     <span className="text-neon-pink font-black text-[10px] rotate-[-90deg] uppercase tracking-tighter">Pish!</span>
-                   </div>
+               {/* ACTUAL FACE UP PISHPIRIK CARDS STICKING OUT! */}
+               {myPishCards.length > 0 && myPishCards.map((cardId, idx) => (
+                 <div key={cardId + idx} className="absolute top-1/2 left-1/2 shadow-lg z-0 transition-transform" style={{ transform: `translate(-50%, -50%) rotate(${90 + idx * 5}deg) translateX(${15 + idx * 2}px)` }}>
+                   <PlayingCard id={cardId} small />
                  </div>
-               )}
+               ))}
 
                <div className="relative h-16 w-11 rounded border border-white/20 shadow-md transition-transform group-hover:-translate-y-1 z-10">
                  <PlayingCard id={null} faceDown small />
@@ -1008,6 +1014,8 @@ function PishpirikBoard({
              </button>
            )}
         </div>
+
+        <div className="flex items-center justify-center py-16">
 
         <div className="flex items-center justify-center py-16">
           {tablePile.length === 0 ? (
