@@ -433,11 +433,22 @@ export function startNextRound(room: Room) {
     if (seat) seat.hand = [];
   });
 
-  if (mode === "pishpirik") {
+ if (mode === "pishpirik") {
+    // 1. Deal 4 cards to each active player
     for (const i of activeSeats) {
       room.seats[i]!.hand = room.game.deck.splice(0, 4);
     }
-    room.game.tablePile = room.game.deck.splice(0, 4);
+    
+    // 2. Deal 4 NON-JACK cards to the table pile
+    const initialTable: string[] = [];
+    for (let i = room.game.deck.length - 1; i >= 0 && initialTable.length < 4; i--) {
+      // Check if the card is a Jack (J_C, J_D, J_H, J_S)
+      if (!room.game.deck[i].startsWith("J_")) {
+        initialTable.push(room.game.deck.splice(i, 1)[0]);
+      }
+    }
+    room.game.tablePile = initialTable;
+    
   } else if (mode === "zhol") {
     for (const i of activeSeats) {
       const isDealer = i === nextDealer;
@@ -457,7 +468,6 @@ export function startNextRound(room: Room) {
     room.game.discardTop = topDiscard;
   }
 }
-
 export function applyGin(room: Room, seatIdx: number, cardId: string) {
   if (!room.game) return { error: "No game." };
   const winnerSeat = room.seats[seatIdx];
