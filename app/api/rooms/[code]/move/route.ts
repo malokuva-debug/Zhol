@@ -238,7 +238,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
               seatIdx: idx,
               deadwood: s ? (s.team === 1 ? team1Pts : team2Pts) : 0,
               deadCards: s ? (s.team === 1 ? team1Captured : team2Captured) : [],
-              pishpirikCards: s ? (s.team === 1 ? (room.game.pishpirikCardsBySeat?.[0] || []) : (room.game.pishpirikCardsBySeat?.[1] || [])) : [],
+              pishpirikCards: s ? (s.team === 1 ? (room.game?.pishpirikCardsBySeat?.[0] || []) : (room.game?.pishpirikCardsBySeat?.[1] || [])) : [],
               melds: [],
               eliminated: false,
               team: s?.team
