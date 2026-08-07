@@ -923,9 +923,23 @@ function PishpirikBoard({
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3 p-2">
                  {myCaptured.length > 0 ? (
-                   myCaptured.map(id => <PlayingCard key={id} id={id} small />)
+                   myCaptured.map((id, idx) => {
+                     const isPishCard = myPishCards.includes(id);
+                     const isJack = id.startsWith("J_");
+                     
+                     return (
+                       <div key={id + "-" + idx} className={`relative ${isPishCard ? 'ring-2 ring-neon-pink rounded-lg shadow-[0_0_15px_rgba(255,91,200,0.6)] scale-105' : ''}`}>
+                         <PlayingCard id={id} small />
+                         {isPishCard && (
+                           <div className="absolute -top-3 -right-3 bg-gradient-to-br from-neon-pink to-purple-600 text-white text-[11px] w-7 h-7 flex items-center justify-center rounded-full font-black shadow-[0_0_10px_#ff5bc8] z-10 border border-white/40">
+                             {isJack ? "+20" : "+10"}
+                           </div>
+                         )}
+                       </div>
+                     );
+                   })
                  ) : (
                    <p className="text-white/40 italic w-full text-center py-8">You haven't captured any cards yet.</p>
                  )}
