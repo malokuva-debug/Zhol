@@ -63,8 +63,34 @@ export default function HandFan({
   const overlapPx = n > 9 ? 34 : 30;
 
   return (
-    // WRAPPED IN RELATIVE DIV to anchor the hand properly
     <div className="relative w-full">
+      
+      {/* 🖐️ THE 4 FINGERS BEHIND THE CARDS */}
+      {/* -z-10 pushes this layer entirely behind the Reorder.Group (the cards) */}
+      <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 -z-10 pointer-events-none drop-shadow-[0_15px_15px_rgba(0,0,0,0.8)]">
+        <svg width="380" height="220" viewBox="0 0 400 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Pinky Finger (Far Left) - slightly shorter */}
+          <path d="M 50 220 C 10 130, 90 100, 110 220" fill="#d49a59" />
+          {/* Pinky Pad Crease */}
+          <path d="M 60 145 Q 80 130 90 160" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+
+          {/* Ring Finger (Mid-Left) - taller */}
+          <path d="M 130 220 C 110 90, 190 80, 190 220" fill="#d49a59" />
+          {/* Ring Pad Crease */}
+          <path d="M 145 120 Q 170 105 175 135" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+
+          {/* Middle Finger (Mid-Right) - tallest */}
+          <path d="M 210 220 C 190 60, 270 60, 260 220" fill="#d49a59" />
+          {/* Middle Pad Crease */}
+          <path d="M 225 100 Q 250 85 245 120" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+
+          {/* Index Finger (Far Right) - angled outward slightly */}
+          <path d="M 280 220 C 310 90, 390 110, 350 220" fill="#d49a59" />
+          {/* Index Pad Crease */}
+          <path d="M 310 135 Q 340 120 330 155" stroke="#bc8345" strokeWidth="3" strokeLinecap="round" fill="none" />
+        </svg>
+      </div>
+
       <Reorder.Group
         axis="x"
         values={order}
@@ -115,7 +141,8 @@ export default function HandFan({
         })}
       </Reorder.Group>
 
-      {/* ✋ THE ACTUAL HAND HOLDING THE CARDS */}
+      {/* ✋ THE THUMB IN FRONT OF THE CARDS */}
+      {/* z-[100] keeps the thumb strictly in front of everything */}
       <div className="absolute -bottom-8 left-1/2 -translate-x-[40%] z-[100] pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]">
         <svg width="180" height="140" viewBox="0 0 180 140" fill="none" xmlns="http://www.w3.org/2000/svg">
           {/* Palm/Base of Hand wrapping around the back */}
@@ -131,6 +158,7 @@ export default function HandFan({
           <path d="M110 35C105 30 115 25 125 28C132 30 130 42 120 40C115 39 110 38 110 35Z" fill="#f8e0c5" />
         </svg>
       </div>
+
     </div>
   );
 }
