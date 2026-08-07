@@ -833,6 +833,15 @@ function PishpirikBoard({
     }
   }, [game.recentPishpirik?.at]);
 
+  // GLOBAL GHOST SKULL ANIMATION (For all players in the room)
+  useEffect(() => {
+    if (game.recentGhostJack && game.recentGhostJack.at > Date.now() - 3000) {
+      setShowSkull(true);
+      const timer = setTimeout(() => setShowSkull(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [game.recentGhostJack?.at]);
+
   const clientId = getClientId();
   const isHost = room.hostClientId === clientId;
 
@@ -855,12 +864,6 @@ function PishpirikBoard({
 
   async function playCard(cardId: string) {
     setActionError("");
-
-    const { rank } = parseCardId(cardId);
-    if (rank === "J" && tablePile.length === 0) {
-      setShowSkull(true);
-      setTimeout(() => setShowSkull(false), 2000);
-    }
 
     const res = await fetch(`/api/rooms/${code}/move`, {
       method: "POST",
