@@ -315,6 +315,7 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
     pendingRemoval: room.game.pendingRemoval,
     pishpirikCardsBySeat: room.game.pishpirikCardsBySeat,
     recentPishpirik: room.game.recentPishpirik,
+    recentGhostJack: room.game.recentGhostJack, // ADDED: Now everyone sees the ghost!
   };
 }
 
@@ -420,6 +421,7 @@ export function startNextRound(room: Room) {
   room.game.pishpirikCardsBySeat = {};
   room.game.recentPishpirik = undefined;
   room.game.lastRoundEnd = undefined;
+  room.game.recentGhostJack = undefined;
   room.game.roundNumber += 1;
 
   if (mode === "zhol") {
