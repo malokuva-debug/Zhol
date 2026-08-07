@@ -251,7 +251,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
              let maxCards = 0;
              let maxSeat = -1;
              activeSeats.forEach(i => {
-                const count = (room.game.capturedBySeat[i] || []).length;
+                // FIXED: Added optional chaining (?)
+                const count = (room.game?.capturedBySeat?.[i] || []).length;
                 if (count > maxCards) { maxCards = count; maxSeat = i; }
                 else if (count === maxCards) { maxSeat = -1; }
              });
@@ -259,7 +260,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
              const pointsBySeat = room.seats.map((s, idx) => {
                 if (!activeSeats.includes(idx)) return { seatIdx: idx, deadwood: 0, deadCards: [], pishpirikCards: [], melds: [], eliminated: true, team: undefined };
                 
-                // FIXED: Added optional chaining (?) to room.game for all nested properties
+                // FIXED: Added optional chaining (?) to all nested room.game calls
                 const captured = room.game?.capturedBySeat?.[idx] || [];
                 let pts = scorePishpirikCards(captured) + (room.game?.pishpiriksBySeat?.[idx] || 0);
                 if (idx === maxSeat) pts += 3;
