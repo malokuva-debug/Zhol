@@ -132,6 +132,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
       seat.hand = seat.hand.filter((c) => c !== cardId);
 
       const tablePile = room.game.tablePile || [];
+      const playedRank = cardId.split("_")[0].slice(0, -1);
+
+      // GLOBAL GHOST SKULL: Triggered if a Jack is played onto an empty table!
+      if (playedRank === "J" && tablePile.length === 0) {
+        room.game.recentGhostJack = { cardId, at: Date.now() };
+      }
       const activeSeats = room.seats.map((s, i) => (s && !s.eliminated ? i : -1)).filter((i) => i !== -1);
       
       const { captures } = checkPishpirikCapture(cardId, tablePile);
