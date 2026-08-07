@@ -143,7 +143,7 @@ export default function HandFan({
       <div className="absolute bottom-[-298px] left-1/2 -translate-x-[45%] z-[250] pointer-events-none drop-shadow-xl w-36 h-auto">
         <svg viewBox="220 900 200 550" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <g id="Thumb">
-            <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 71.53 16.68 14.9-42.39 17.86-42.39 17.86z"/>
+            <path id="Shape-2" fillRule="evenodd" fill="#ffca7e" d="m309.27 1039.19c0 0-45.29-72.11-32.77-101.9 12.51-29.8 36.35-11.32 43.5 12.51 7.15 23.84 14.97 56.63 31.66 79.53 120.68 300.9-42.39 300.86-42.39 300.86z"/>
             <path id="Shape-3" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m349.19 1019.52c0 0 18.48 16.69 19.07 32.78 0.6 16.08 45.89 103.09-1.19 151.35"/>
             <path id="Shape-21" fillRule="evenodd" fill="#ffffff" opacity={0.6} d="m288.38 958.23l-2.44-1.16-2.74-1.93-1.12-2.39-1.93-5.43-0.41-3.4 0.26-6.35c0 0 0.05-9.34 8.88-14.77 10.16-3.86 19.3 5.73 22.65 10.35l0.91 3.25 3.71 15.79-1.78-0.45-2.69-0.11-6.09 0.41-5.39 1.57-6.24 2.29z"/>
             <path id="Shape-4" fillRule="evenodd" fill="none" stroke="#000000" strokeMiterlimit={100} d="m275.9 974.23c0 0 16.68 34.57 33.37 62.57 0 0-1.19 35.16-6.56 44.1-5.36 8.94-1.78 45.29 2.98 50.05 4.77 4.77-16.08 45.89-16.08 45.89"/>
