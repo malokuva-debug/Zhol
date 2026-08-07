@@ -313,6 +313,8 @@ export function toClientGameState(room: Room, yourSeat: number | null): ClientGa
     piecesOnBoard: room.game.piecesOnBoard,
     cicmicPhase: room.game.cicmicPhase,
     pendingRemoval: room.game.pendingRemoval,
+    pishpirikCardsBySeat: room.game.pishpirikCardsBySeat,
+    recentPishpirik: room.game.recentPishpirik,
   };
 }
 
@@ -415,6 +417,8 @@ export function startNextRound(room: Room) {
   room.game.discardTop = null;
   room.game.capturedBySeat = {};
   room.game.pishpiriksBySeat = {};
+  room.game.pishpirikCardsBySeat = {};
+  room.game.recentPishpirik = undefined;
   room.game.lastRoundEnd = undefined;
   room.game.roundNumber += 1;
 
